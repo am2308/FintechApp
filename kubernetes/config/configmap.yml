@@ -4,6 +4,6 @@ metadata:
     name: banking-config
 data:
     ENVIRONMENT: "production"
-    ACCOUNT_SERVICE_URL: "http://account-service:8080"
-    TRANSACTION_SERVICE_URL: "http://transaction-service:8081"
+    ACCOUNT_SERVICE_URL: "http://account-service:8081"
+    TRANSACTION_SERVICE_URL: "http://transaction-service:8083"
     AUTH_SERVICE_URL: "http://auth-service:8082"

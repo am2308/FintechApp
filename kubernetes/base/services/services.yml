@@ -5,7 +5,7 @@ metadata:
   namespace: banking
   annotations:
     prometheus.io/scrape: "true"
-    prometheus.io/port: "8080"
+    prometheus.io/port: "8081"
     prometheus.io/path: "/metrics"
 spec:
   type: ClusterIP
@@ -14,7 +14,7 @@ spec:
   ports:
     - name: http
       port: 80
-      targetPort: 8080
+      targetPort: 8081
       protocol: TCP
 
 ---
@@ -25,7 +25,7 @@ metadata:
   namespace: banking
   annotations:
     prometheus.io/scrape: "true"
-    prometheus.io/port: "8080"
+    prometheus.io/port: "8083"
     prometheus.io/path: "/metrics"
 spec:
   type: ClusterIP
@@ -34,7 +34,7 @@ spec:
   ports:
     - name: http
       port: 80
-      targetPort: 8080
+      targetPort: 8083
       protocol: TCP
 
 ---
@@ -45,7 +45,7 @@ metadata:
   namespace: banking
   annotations:
     prometheus.io/scrape: "true"
-    prometheus.io/port: "8080"
+    prometheus.io/port: "8082"
     prometheus.io/path: "/metrics"
 spec:
   type: ClusterIP
@@ -54,5 +54,5 @@ spec:
   ports:
     - name: http
       port: 80
-      targetPort: 8080
+      targetPort: 8082
       protocol: TCP

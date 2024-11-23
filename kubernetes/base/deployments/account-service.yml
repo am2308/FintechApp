@@ -34,17 +34,12 @@ spec:
             topologyKey: topology.kubernetes.io/zone
       containers:
       - name: account-service
-        image: your-registry/account-service:latest
+        image: akhilmittal510/account-service:latest
         ports:
-        - containerPort: 8080
+        - containerPort: 8081
         envFrom:
         - configMapRef:
             name: banking-config
-        env:
-        - name: DB_PASSWORD_FILE
-          value: "/mnt/secrets-store/DB_PASSWORD"
-        - name: JWT_SECRET_FILE
-          value: "/mnt/secrets-store/JWT_SECRET"
         resources:
           requests:
             memory: "256Mi"
@@ -55,16 +50,5 @@ spec:
         readinessProbe:
           httpGet:
             path: /health
-            port: 8080
-        volumeMounts:
-          name: secrets-store
-          mountPath: /mnt/secrets-store 
-          readOnly: true
-        volumes: 
-        - name: secrets-store 
-          csi:
-            driver: secrets-store.csi.k8s.io
-            readOnly: true
-            volumeAttributes:
-              secretProviderClass: banking-secrets-aws
+            port: 8081
               
