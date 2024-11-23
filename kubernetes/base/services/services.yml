@@ -8,7 +8,7 @@ metadata:
     prometheus.io/port: "8081"
     prometheus.io/path: "/metrics"
 spec:
-  type: ClusterIP
+  type: NodePort
   selector: 
     app: account-service
   ports:
@@ -28,7 +28,7 @@ metadata:
     prometheus.io/port: "8083"
     prometheus.io/path: "/metrics"
 spec:
-  type: ClusterIP
+  type: NodePort
   selector: 
     app: transaction-service
   ports:
@@ -48,7 +48,7 @@ metadata:
     prometheus.io/port: "8082"
     prometheus.io/path: "/metrics"
 spec:
-  type: ClusterIP
+  type: NodePort
   selector: 
     app: auth-service
   ports:
