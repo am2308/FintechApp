@@ -29,8 +29,4 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8081
               
