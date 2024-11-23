@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy Application Code
 COPY . /app
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e ..
 # Set Environment Variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
