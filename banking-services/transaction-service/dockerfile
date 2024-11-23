@@ -2,13 +2,18 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy Requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy Application Code
+# Copy the entire project root into the container
 COPY . /app
-RUN pip install --no-cache-dir -e .
+
+# Set up the working directory for account-service
+WORKDIR /app/transaction-service
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -e ..
+
+# Set PYTHONPATH
+ENV PYTHONPATH=/app
 
 # Set Environment Variables
 ENV PYTHONUNBUFFERED=1
@@ -17,7 +22,6 @@ ENV PYTHONUNBUFFERED=1
 HEALTHCHECK --interval=30s --timeout=3s \
     CMD curl -f http://localhost:8083/health || exit 1
 
-# Expose port
 EXPOSE 8083
 
 # Run with Uvicorn
