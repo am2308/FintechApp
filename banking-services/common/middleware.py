@@ -3,6 +3,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from prometheus_client import Counter, Histogram, Gauge
 import time
 
+
 class MetricsMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, app_name: str):
         super().__init__(app)
@@ -41,7 +42,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
         try:
             response = await call_next(request)
-            
+
             # Record request metrics
             duration = time.time() - start_time
             self.request_count.labels(
@@ -75,7 +76,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 ).inc()
 
             return response
-            
+
         except Exception as e:
             self.service_up.labels(app=self.app_name).set(0)
             raise e

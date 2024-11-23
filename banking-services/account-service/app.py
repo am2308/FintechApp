@@ -18,21 +18,10 @@ class AccountResponse(AccountBase):
     account_id: str
     created_at: datetime
     status: str
-'''
+
 app = FastAPI()
 
-metrics_middleware = MetricsMiddleware(app_name="account-service")
-app.add_middleware(metrics_middleware.__class__, app_name="account-service")
-
-metrics_app = make_asgi_app()
-app.mount("/metrics", metrics_app)
-'''
-app = FastAPI()
-
-# Add the middleware with app_name="auth-service"
-metrics_middleware = MetricsMiddleware(app_name="account-service")
-app.add_middleware(metrics_middleware.__class__, app_name="account-service")
-#app.add_middleware(MetricsMiddleware, app=app, app_name="auth-service")
+app.add_middleware(MetricsMiddleware, app_name="account-service")
 
 # Mount the Prometheus metrics endpoint
 metrics_app = make_asgi_app()

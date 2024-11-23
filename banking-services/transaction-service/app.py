@@ -19,8 +19,7 @@ class TransactionResponse(TransactionBase):
     timestamp: datetime
 
 app = FastAPI()
-metrics_middleware = MetricsMiddleware(app_name="transaction-service")
-app.add_middleware(metrics_middleware.__class__, app_name="transaxtion-service")
+app.add_middleware(MetricsMiddleware, app_name="transaction-service")
 
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
