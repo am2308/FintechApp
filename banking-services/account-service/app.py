@@ -30,7 +30,9 @@ app.mount("/metrics", metrics_app)
 app = FastAPI()
 
 # Add the middleware with app_name="auth-service"
-app.add_middleware(MetricsMiddleware, app=app, app_name="auth-service")
+metrics_middleware = MetricsMiddleware(app_name="account-service")
+app.add_middleware(metrics_middleware.__class__, app_name="account-service")
+#app.add_middleware(MetricsMiddleware, app=app, app_name="auth-service")
 
 # Mount the Prometheus metrics endpoint
 metrics_app = make_asgi_app()
