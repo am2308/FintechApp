@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: banking-services-monitor
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - account-service
+          - auth-service
+          - transaction-service
+  endpoints:
+    - port: http  
+      path: /metrics
+      interval: 15s

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: restore-procedure
+  namespace: banking
+data:
+  restore-steps: |
+    1. Verify Backup Availability:
+       velero backup get
+
+    2. Restore Entire Namespace:
+       velero restore create --from-backup [backup-name] --include-namespaces banking
+
+    3. Verify Specific Resources:
+       kubectl get all -n banking
+       kubectl get configmaps -n banking
+       kubectl get secrets -n banking
+
+    4. Database Restore (if needed):
+       kubectl exec -it [pod-name] -- psql -U postgres -c "SELECT pg_restore('/backup/db.dump');"
+
+    5. Verify Application Health:
+       kubectl get pods -n banking
+       kubectl describe pods -n banking
+       kubectl logs [pod-name] -n banking

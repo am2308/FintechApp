@@ -1,0 +1,139 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: banking-services-alerts
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: banking-services-availability
+      rules:
+        # Service Availability Alerts
+        - alert: ServiceDown
+          expr: up{app=~"account-service|auth-service|transaction-service"} == 0
+          for: 1m
+          labels: 
+            severity: critical
+          annotations:
+            summary: "{{$labels.app}} is down"
+            description: "{{$labels.app}} has been down for more than 1 minute"
+
+    - name: banking-services-alerts 
+      rules: 
+        # Response Time Alerts
+        - alert: HighResponseTime
+          expr: |
+            rate(http_request_duration_seconds_sum{app=~"account-service|auth-service|transaction-service"}[5m])
+            /
+            rate(http_request_duration_seconds_count{app=~"account-service|auth-service|transaction-service}[5m])
+            > 0.5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High response time on {{$labels.app}}"
+            description: "Service {{$labels.app}} has a response time above 500ms"
+
+        - alert: High90thPercentileLatency
+          expr: |
+            histogram_quantile(0.9,
+              rate(http_request_duration_seconds_bucket{app=~"account-service|auth-service|transaction-service"}[5m])
+            ) > 1
+          for: 5m 
+          labels: 
+            severity: warning
+          annotations:
+            summary: "High 90th precentile latency on {{$labels.app}}"
+            description: "90% of requests in {{$labels.app}} are taking more than 1s"
+
+    - name: banking-services-resources
+      rules:
+        # Memory Usage
+        - alert: HighMemoryUsage
+          expr: |
+            container_memory_usage_bytes{pod=~"account-service-.*|auth-service-.*|transaction-service-.*"}
+            /
+            container_memory_limit_bytes{pod=~"account-service-.*|auth-service-.*|transaction-service-.*"}
+            > 0.85
+          for: 5m 
+          labels:
+            severity: warning 
+          annotations:
+            summary: "High memory usage in {{$labels.pod}}"
+            description: "Pod {{$labels.pod}} is using more than 85% of its memory limit"
+
+        # CPU Usage
+        - alert: HighCPUUsage
+          expr: |
+            rate(container_cpu_usage_seconds_total{pod=~"account-service.-*|auth-service-.*|transaction-service-.*"})
+            > 0.85
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU Usage in {{$labels.pod}}"
+              description: "Pod {{$labels.app}} is using more than 85% of its CPU"
+
+    - name: banking-services-business
+      rules:
+        # Account Service Specific
+        - alert: HighAccountCreationFailureRate
+          expr: |
+            rate(http_requests_total{app="account-service",status=~"5..", endpoint="/accounts"}[5m])
+            /
+            rate(http_requests_total{app="account-service", endpoint="/accounts"}[5m])
+            > 0.01
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High account creation failure rate"
+            description: "Account creation failures above 1%"
+
+        # Auth Service Specific
+        - alert: HighAuthenticationFailureRate
+          expr: |
+            rate(http_requests_total{app="auth-service",status=~"4..", endpoint="/token"}[5m])
+            /
+            rate(http_requests_total{app="auth-service", endpoint="/token"}[5m])
+            > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High authentication failure rate"
+            description: "Authentication failures above 10%"
+
+        # Transaction Service Specific
+        - alert: HighTransactionFailureRate
+          expr: |
+            rate(http_requests_total{app="transaction-service",status=~"5..", endpoint="/transactions"}[5m])
+            /
+            rate(http_requests_total{app="transaction-service", endpoint="/transactions"}[5m])
+            > 0.01
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High transaction failure rate"
+            description: "Transaction failures above 1%"
+
+    - name: banking-services-slos
+      rules:
+        # SLO alerts for each service
+        - alert: SLOViolation
+          expr: |
+            (
+              sum(rate(http_requests_total{status=~"2..", app=~"account-service|auth-service|transaction-service"}[30m]))
+              /
+              sum(rate(http_requests_total{app=~"account-service|auth-service|transaction-service"}[30m]))
+            ) < 0.995
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "SLO Violation for {{$labels.app}}"
+            description: "Service availability is below 99.5% over the last 30 minutes"
+
+
+          

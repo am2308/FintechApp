@@ -1,0 +1,17 @@
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: banking-daily-backup
+  namespace: velero 
+spec: 
+  schedule: "0 2 * * *" # Daily at 2AM
+  template: 
+    includeNamespaces:
+    - banking 
+    ttl: 720h 
+    storageLocation: default
+    volumeSnapshotLocations: 
+    - default 
+  useOwnerReferencesInBackup: true
+
+  

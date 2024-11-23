@@ -1,0 +1,129 @@
+# HorizontalPodAutoscaler for account-service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: account-service-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: account-service
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+
+---
+
+# PodDisruptionBudget for account-service
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: 
+  name: account-service-pbd
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: account-service
+
+---
+
+# HorizontalPodAutoscaler for transaction-service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: transaction-service-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: transaction-service
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+
+---
+
+# PodDisruptionBudget for transaction-service
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: 
+  name: transaction-service-pbd
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: transaction-service     
+
+---
+
+# HorizontalPodAutoscaler for auth-service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: auth-service-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: auth-service
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+
+---
+
+# PodDisruptionBudget for auth-service
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: 
+  name: auth-service-pbd
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: auth-service

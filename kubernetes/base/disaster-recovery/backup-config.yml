@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: banking-backup
+  namespace: banking
+spec:
+  schedule: "0 1 * * *" # Daily at 1AM
+  concurrencePolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec: 
+          serviceAccountName: banking-service-account
+          containers: 
+          - name: backup 
+            image: bitnami/kubectl:latest
+            command: 
+            - /bin/sh
+            - -c 
+            - |
+              # Backup all resources in banking namespace
+              kubectl get all -n banking -o yaml > /backup/banking-resources-$(date +%Y%m%d).yaml
+              # Backup all configmaps 
+              kubectl get configmaps -n banking -0 yaml > /backup/banking-configmap-$(date +%Y%m%d).yaml
+              # Backup all secrets 
+              kubectl get secrets  -n banking -o yaml > /backup/banking-secrets-$(date +%Y%m%d).yaml
+            volumeMounts:
+            - name: backup-volume
+              persistentVolumeClaim:
+                claimName: backup-pvc
+                restartPolicy: OnFailure
