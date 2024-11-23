@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: account-service
-  namespace: banking
+  namespace: bank
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "8081"
@@ -22,7 +22,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: transaction-service
-  namespace: banking
+  namespace: bank
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "8083"
@@ -42,7 +42,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: auth-service
-  namespace: banking
+  namespace: bank
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "8082"

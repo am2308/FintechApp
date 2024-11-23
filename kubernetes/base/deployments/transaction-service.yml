@@ -14,24 +14,6 @@ spec:
       labels:
         app: transaction-service
     spec:
-      serviceAccountName: banking-service-account
-      topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfied: DoNotSchedule
-        labelSelector:
-          matchLabels:
-            app: transaction-service 
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: app
-                operator: In 
-                values: 
-                - transaction-service 
-            topologyKey: topology.kubernetes.io/zone
       containers:
       - name: transaction-service
         image: akhilmittal510/transaction-service:latest

@@ -14,24 +14,6 @@ spec:
       labels:
         app: account-service
     spec:
-      serviceAccountName: banking-service-account
-      topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfied: DoNotSchedule
-        labelSelector:
-          matchLabels:
-            app: account-service 
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: app
-                operator: In 
-                values: 
-                - account-service 
-            topologyKey: topology.kubernetes.io/zone
       containers:
       - name: account-service
         image: akhilmittal510/account-service:latest

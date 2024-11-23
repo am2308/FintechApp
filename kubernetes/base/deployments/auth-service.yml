@@ -14,24 +14,6 @@ spec:
       labels:
         app: auth-service
     spec:
-      serviceAccountName: banking-service-account
-      topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfied: DoNotSchedule
-        labelSelector:
-          matchLabels:
-            app: auth-service 
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: app
-                operator: In
-                values: 
-                - auth-service 
-            topologyKey: topology.kubernetes.io/zone
       containers:
       - name: auth-service
         image: akhilmittal510/auth-service:latest
