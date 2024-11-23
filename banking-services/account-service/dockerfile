@@ -11,6 +11,7 @@ COPY . /app
 RUN pip install --no-cache-dir -e .
 # Set Environment Variables
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 # Health Check
 HEALTHCHECK --interval=30s --timeout=3s \
