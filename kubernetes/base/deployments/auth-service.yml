@@ -19,9 +19,16 @@ spec:
         image: akhilmittal510/auth-service:latest
         ports:
         - containerPort: 8082
-        envFrom:
-        - configMapRef:
-            name: banking-config
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: root-password
+        - name: MYSQL_HOST
+          value: mysql
+        - name: MYSQL_DB
+          value: banking
         resources:
           requests:
             memory: "256Mi"
