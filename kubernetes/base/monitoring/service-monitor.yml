@@ -1,19 +1,19 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: banking-services-monitor
+  name: banking-metrics
+  namespace: monitoring  # Deploy in the same namespace as Prometheus
   labels:
-    release: prometheus
+    release: prometheus  # Match the release name of your Prometheus stack
 spec:
   selector:
-    matchExpressions:
-      - key: app
-        operator: In
-        values:
-          - account-service
-          - auth-service
-          - transaction-service
+    matchLabels:
+      app: banking-service  # Match labels on your services
+  namespaceSelector:
+    matchNames:
+    - banking  # The namespace where your services are running
   endpoints:
-    - port: http  
-      path: /metrics
-      interval: 15s
+  - port: http  # Ensure your service exposes a port named 'http'
+    path: /metrics
+    interval: 30s
+
