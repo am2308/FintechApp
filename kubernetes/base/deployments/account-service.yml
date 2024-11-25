@@ -5,7 +5,7 @@ metadata:
   labels:
     app: account-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: account-service
@@ -29,6 +29,8 @@ spec:
           value: mysql
         - name: MYSQL_DB
           value: banking
+        - name: PYTHONPATH
+          value: "/app/account-service"
         resources:
           requests:
             memory: "256Mi"

@@ -26,6 +26,8 @@ spec:
             secretKeyRef:
               name: mysql-secret
               key: root-password
+        args:
+        - "--skip-grant-tables"
         volumeMounts:
         - name: mysql-data
           mountPath: /var/lib/mysql
