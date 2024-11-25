@@ -60,7 +60,7 @@ class AccountResponse(AccountBase):
 
 app = FastAPI()
 
-app.add_middleware(MetricsMiddleware, app_name="account-service")
+app.add_middleware(MetricsMiddleware, app_name="auth-service")
 
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)

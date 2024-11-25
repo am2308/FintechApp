@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: banking-ingress
+  namespace: banking
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: / # Forward paths as-is
+spec:
+  ingressClassName: nginx
+  rules:
+  # Host for Account Service
+  - host: accounts.demoprojectbc1.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: account-service
+            port:
+              number: 81
+  # Host for Transaction Service
+  - host: transaction.demoprojectbc1.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: transaction-service
+            port:
+              number: 83
+

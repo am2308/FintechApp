@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        args:
+          - "--default-authentication-plugin=mysql_native_password"
+          - "--bind-address=0.0.0.0"
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "account123"
+          #valueFrom:
+          #secretKeyRef:
+          #name: mysql-secret
+          #key: root-password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      initContainers:
+      - name: install-utils
+        image: busybox
+        command:
+        - sh
+        - -c
+        - |
+          # Install necessary tools in the MySQL container
+          cp /bin/telnet /mysql-bin/telnet;
+          cp /bin/netstat /mysql-bin/netstat;
+        volumeMounts:
+        - name: mysql-bin
+          mountPath: /mysql-bin
+      volumes:
+        - name: mysql-bin
+          emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: mysql-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+
