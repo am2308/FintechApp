@@ -55,7 +55,7 @@ jobs:
 
       - name: Update kubeconfig for EKS
         run: |
-          aws eks update-kubeconfig --region eu-west-1 --name amcdemo
+          aws eks update-kubeconfig --region ap-south-1 --name amcdemo
 
       - name: Apply Kubernetes Manifests
         run: |
