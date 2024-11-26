@@ -3,7 +3,7 @@ name: CI/CD Pipeline for Global Banking App
 on:
   push:
     branches:
-      - main  # Trigger on pushes to the main branch
+      - feature/k8  # Trigger on pushes to the main branch
 
 jobs:
   build-and-push-docker:
@@ -27,8 +27,11 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/bank_application_${{ matrix.service }}:latest banking-services/${{ matrix.service }}
-          docker push ${{ secrets.DOCKER_USERNAME }}/bank_application_${{ matrix.service }}:latest
+          ls -lart
+          cd banking-services
+          ls -lart
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:latest -f ${{ matrix.service }}/dockerfile .
+          docker push ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:latest
 
   deploy-to-eks:
     name: Deploy to EKS
@@ -43,7 +46,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-1  # Change to your EKS region
+          aws-region: ap-south-1  # Change to your EKS region
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
@@ -52,12 +55,19 @@ jobs:
 
       - name: Update kubeconfig for EKS
         run: |
-          aws eks update-kubeconfig --region eu-west-1 --name amcdemo
+          aws eks update-kubeconfig --region ap-south-1 --name amcdemo
 
       - name: Apply Kubernetes Manifests
         run: |
-          kubectl apply -k kubernetes/base/deployments
-          kubectl apply -k kubernetes/base/services # Apply base configs
-          kubectl apply -f kubernetes/config
-          kubectl apply -f kubernetes/secrets
-          kubectl apply -f kubernetes/ingress
+          ls -lart
+          kubectl create ns banking
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo update
+          helm install nginx-ingress ingress-nginx/ingress-nginx --namespace ingress-nginx --create-namespace
+          kubectl apply -f kubernetes/config/pv.yaml -n banking
+          kubectl apply -f kubernetes/secrets/mysql-secret.yaml -n banking
+          kubectl apply -f kubernetes/base/deployments/ -n banking
+          kubectl apply -k kubernetes/base/services/ -n banking
+          kubectl apply -k kubernetes/base/ingress/ -n banking
+          
+          
