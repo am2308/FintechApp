@@ -1,6 +1,3 @@
-from fastapi.templating import Jinja2Templates
-from fastapi.requests import Request
-from fastapi.responses import HTMLResponse
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
 from typing import List
@@ -73,7 +70,7 @@ Base.metadata.create_all(bind=engine)
 
 # # FastAPI app setup
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+
 # Jaeger setup
 resource = Resource(attributes={
     "service.name": "transaction-service",
@@ -130,7 +127,6 @@ def get_db():
         db.close()
 
 # HTML templates
-'''
 def render_customer_form():
     return """
     <!DOCTYPE html>
@@ -227,16 +223,16 @@ def render_account_details(account):
     </body>
     </html>
     """
-'''
+
 @app.get("/transaction", response_class=HTMLResponse)
-async def get_customer_form(request: Request):
+async def get_customer_form():
     tracer = trace.get_tracer("transaction-service")
     with tracer.start_as_current_span("manual-span"):
         print("Span created for /transaction")
-    return templates.TemplateResponse("customer_form.html", {"request": request})
+    return render_customer_form()
 
 @app.post("/transaction", response_class=HTMLResponse)
-async def authenticate_customer(request: Request, customer_id: str = Form(...), db=Depends(get_db)):
+async def authenticate_customer(customer_id: str = Form(...), db=Depends(get_db)):
     # Call auth-service for verification
     auth_url = f"http://{AUTH_HOST}:{AUTH_PORT}/authenticate/{customer_id}"
     response = make_authenticated_request(auth_url)
@@ -247,12 +243,12 @@ async def authenticate_customer(request: Request, customer_id: str = Form(...), 
         account = db.query(AccountModel).filter(AccountModel.customer_id == customer_id).first()
         if not account:
             return HTMLResponse(content=f"<h1>Customer ID {customer_id} does not exist in the database.</h1>")
-        return templates.TemplateResponse("transaction_form.html", {"request": request, "customer_id": customer_id})
+        return render_transaction_form(customer_id)
     else:
         return HTMLResponse(content=f"<h1>Authentication failed for Customer ID: {customer_id}</h1>")
 
 @app.post("/transaction-process", response_class=HTMLResponse)
-async def process_transaction(request: Request, customer_id: str = Form(...), transaction_type: str = Form(...), amount: float = Form(...), db=Depends(get_db)):
+async def process_transaction(customer_id: str = Form(...), transaction_type: str = Form(...), amount: float = Form(...), db=Depends(get_db)):
     # Fetch account details
     account = db.query(AccountModel).filter(AccountModel.customer_id == customer_id).first()
     if not account:
@@ -276,7 +272,7 @@ async def process_transaction(request: Request, customer_id: str = Form(...), tr
     db.add(transaction)
     db.commit()
 
-    return templates.TemplateResponse("account_details.html", {"request": request, "account": account})
+    return render_account_details(account)
 
 @app.get("/health")
 async def health_check():

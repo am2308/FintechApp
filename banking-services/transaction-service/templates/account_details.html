@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Account Details</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Updated Account Details</h1>
+    <table>
+        <tr>
+            <th>Account ID</th>
+            <td>{{ account.account_id }}</td>
+        </tr>
+        <tr>
+            <th>Customer ID</th>
+            <td>{{ account.customer_id }}</td>
+        </tr>
+        <tr>
+            <th>Account Type</th>
+            <td>{{ account.account_type }}</td>
+        </tr>
+        <tr>
+            <th>Currency</th>
+            <td>{{ account.currency }}</td>
+        </tr>
+        <tr>
+            <th>Balance</th>
+            <td>{{ account.balance }}</td>
+        </tr>
+        <tr>
+            <th>Status</th>
+            <td>{{ account.status }}</td>
+        </tr>
+    </table>
+    <a href="/transaction">New Transaction</a>
+</body>
+</html>
