@@ -1,0 +1,5 @@
+auth:
+  strategy: "anonymous"  # Set authentication strategy (can also be "login" for secured access)
+server:
+  port: 20001
+istio_namespace: "istio-system"
