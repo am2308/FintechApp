@@ -5,16 +5,16 @@ metadata:
   namespace: banking
   annotations:
     prometheus.io/scrape: "true"
-    prometheus.io/port: "8081"
+    prometheus.io/port: "8080"
     prometheus.io/path: "/metrics"
 spec:
-  type: NodePort
+  type: ClusterIP
   selector: 
     app: account-service
   ports:
     - name: http
-      port: 81
-      targetPort: 8081
+      port: 80
+      targetPort: 8080
       protocol: TCP
 
 ---
@@ -25,16 +25,16 @@ metadata:
   namespace: banking
   annotations:
     prometheus.io/scrape: "true"
-    prometheus.io/port: "8083"
+    prometheus.io/port: "8080"
     prometheus.io/path: "/metrics"
 spec:
-  type: NodePort
+  type: ClusterIP
   selector: 
     app: transaction-service
   ports:
     - name: http
-      port: 83
-      targetPort: 8083
+      port: 80
+      targetPort: 8080
       protocol: TCP
 
 ---
@@ -45,7 +45,7 @@ metadata:
   namespace: banking
   annotations:
     prometheus.io/scrape: "true"
-    prometheus.io/port: "8082"
+    prometheus.io/port: "8080"
     prometheus.io/path: "/metrics"
 spec:
   type: ClusterIP
@@ -53,26 +53,6 @@ spec:
     app: auth-service
   ports:
     - name: http
-      port: 82
-      targetPort: 8082
-      protocol: TCP
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mysql
-  namespace: banking
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "3306"
-    prometheus.io/path: "/metrics"
-spec:
-  type: ClusterIP
-  selector: 
-    app: mysql
-  ports:
-    - name: mysql
-      port: 3306
-      targetPort: 3306
+      port: 80
+      targetPort: 8080
       protocol: TCP

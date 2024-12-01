@@ -5,7 +5,7 @@ metadata:
   labels:
     app: account-service
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: account-service
@@ -14,29 +14,37 @@ spec:
       labels:
         app: account-service
     spec:
+      serviceAccountName: banking-service-account
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfied: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: account-service 
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In 
+                values: 
+                - account-service 
+            topologyKey: topology.kubernetes.io/zone
       containers:
       - name: account-service
-        image: akhilmittal510/account-service:latest
+        image: your-registry/account-service:latest
         ports:
-        - containerPort: 8081
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: banking-config
         env:
-        - name: MYSQL_ROOT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: mysql-secret
-              key: root-password
-        - name: MYSQL_HOST
-          value: mysql
-        - name: MYSQL_DB
-          value: banking
-        - name: PYTHONPATH
-          value: "/app/account-service"
-        - name: OTEL_LOG_LEVEL
-          value: DEBUG
-        - name: OTEL_EXPORTER_JAEGER_ENDPOINT
-          value: "http://jaeger-collector.tracing:14268/api/traces"
-        - name: OTEL_SERVICE_NAME
-          value: "account-service"
+        - name: DB_PASSWORD_FILE
+          value: "/mnt/secrets-store/DB_PASSWORD"
+        - name: JWT_SECRET_FILE
+          value: "/mnt/secrets-store/JWT_SECRET"
         resources:
           requests:
             memory: "256Mi"
@@ -44,4 +52,19 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+        volumeMounts:
+          name: secrets-store
+          mountPath: /mnt/secrets-store 
+          readOnly: true
+        volumes: 
+        - name: secrets-store 
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: banking-secrets-aws
               

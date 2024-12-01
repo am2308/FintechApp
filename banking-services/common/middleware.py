@@ -1,13 +1,8 @@
 from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
 from prometheus_client import Counter, Histogram, Gauge
-import time
 
-
-class MetricsMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, app_name: str):
-        super().__init__(app)
-
+class MetricsMiddleware:
+    def __init__(self, app_name: str):
         # Basic request metrics
         self.request_count = Counter(
             'http_requests_total',
@@ -19,7 +14,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             'HTTP request latency',
             ['service']
         )
-
+        
         # Business metrics
         self.business_operations = Counter(
             'business_operations_total',
@@ -37,12 +32,13 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         self.app_name = app_name
         self.service_up.labels(app=self.app_name).set(1)
 
-    async def dispatch(self, request: Request, call_next):
+    async def __call__(self, request: Request, call_next):
+        import time
         start_time = time.time()
 
         try:
             response = await call_next(request)
-
+            
             # Record request metrics
             duration = time.time() - start_time
             self.request_count.labels(
@@ -76,7 +72,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 ).inc()
 
             return response
-
+            
         except Exception as e:
             self.service_up.labels(app=self.app_name).set(0)
             raise e
