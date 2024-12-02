@@ -53,6 +53,12 @@ jobs:
         with:
           version: 'latest'
 
+      - name: Install aws-iam-authenticator
+        run: |
+          curl -o aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/latest/bin/linux/amd64/aws-iam-authenticator
+          chmod +x ./aws-iam-authenticator
+          sudo mv ./aws-iam-authenticator /usr/local/bin/
+
       - name: Update kubeconfig for EKS
         run: |
           aws eks update-kubeconfig --region ap-south-1 --name amcdemo
