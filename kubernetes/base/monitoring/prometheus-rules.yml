@@ -12,7 +12,7 @@ spec:
         - alert: ServiceDown
           expr: up{app=~"account-service|auth-service|transaction-service"} == 0
           for: 1m
-          labels: 
+          labels:
             severity: critical
           annotations:
             summary: "{{$labels.app}} is down"
@@ -29,15 +29,14 @@ spec:
             summary: "Test Alert"
             description: "This is a test alert to verify configuration."
 
-
-    - name: banking-services-alerts 
-      rules: 
+    - name: banking-services-alerts
+      rules:
         # Response Time Alerts
         - alert: HighResponseTime
           expr: |
             rate(http_request_duration_seconds_sum{app=~"account-service|auth-service|transaction-service"}[5m])
             /
-            rate(http_request_duration_seconds_count{app=~"account-service|auth-service|transaction-service}[5m])
+            rate(http_request_duration_seconds_count{app=~"account-service|auth-service|transaction-service"}[5m])
             > 0.5
           for: 5m
           labels:
@@ -51,11 +50,11 @@ spec:
             histogram_quantile(0.9,
               rate(http_request_duration_seconds_bucket{app=~"account-service|auth-service|transaction-service"}[5m])
             ) > 1
-          for: 5m 
-          labels: 
+          for: 5m
+          labels:
             severity: warning
           annotations:
-            summary: "High 90th precentile latency on {{$labels.app}}"
+            summary: "High 90th percentile latency on {{$labels.app}}"
             description: "90% of requests in {{$labels.app}} are taking more than 1s"
 
     - name: banking-services-resources
@@ -67,9 +66,9 @@ spec:
             /
             container_memory_limit_bytes{pod=~"account-service-.*|auth-service-.*|transaction-service-.*"}
             > 0.85
-          for: 5m 
+          for: 5m
           labels:
-            severity: warning 
+            severity: warning
           annotations:
             summary: "High memory usage in {{$labels.pod}}"
             description: "Pod {{$labels.pod}} is using more than 85% of its memory limit"
@@ -77,14 +76,14 @@ spec:
         # CPU Usage
         - alert: HighCPUUsage
           expr: |
-            rate(container_cpu_usage_seconds_total{pod=~"account-service.-*|auth-service-.*|transaction-service-.*"})
+            rate(container_cpu_usage_seconds_total{pod=~"account-service-.*|auth-service-.*|transaction-service-.*"}[5m])
             > 0.85
-            for: 5m
-            labels:
-              severity: warning
-            annotations:
-              summary: "High CPU Usage in {{$labels.pod}}"
-              description: "Pod {{$labels.app}} is using more than 85% of its CPU"
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage in {{$labels.pod}}"
+            description: "Pod {{$labels.pod}} is using more than 85% of its CPU"
 
     - name: banking-services-business
       rules:
@@ -146,6 +145,3 @@ spec:
           annotations:
             summary: "SLO Violation for {{$labels.app}}"
             description: "Service availability is below 99.5% over the last 30 minutes"
-
-
-          
