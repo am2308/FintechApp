@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         service:
-          - account-service  # Replace with actual service names in the `banking-services` folder
+          - account-service  # Replace with actual service names in the `banking-services`
           - auth-service
           - transaction-service
     steps:
