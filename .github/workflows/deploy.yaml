@@ -73,7 +73,7 @@ jobs:
           kubectl apply -f kubernetes/config/pv.yaml -n banking
           kubectl apply -f kubernetes/secrets/mysql-secret.yml -n banking
           kubectl apply -f kubernetes/base/deployments/ -n banking
-          kubectl apply -k kubernetes/base/services/ -n banking
-          kubectl apply -k kubernetes/base/ingress/ -n banking
+          kubectl apply -f kubernetes/base/services/ -n banking
+          kubectl apply -f kubernetes/base/ingress/ -n banking
           
           
