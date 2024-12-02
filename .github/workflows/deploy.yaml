@@ -71,7 +71,7 @@ jobs:
           helm repo update
           helm install nginx-ingress ingress-nginx/ingress-nginx --namespace ingress-nginx --create-namespace
           kubectl apply -f kubernetes/config/pv.yaml -n banking
-          kubectl apply -f kubernetes/secrets/mysql-secret.yaml -n banking
+          kubectl apply -f kubernetes/secrets/mysql-secret.yml -n banking
           kubectl apply -f kubernetes/base/deployments/ -n banking
           kubectl apply -k kubernetes/base/services/ -n banking
           kubectl apply -k kubernetes/base/ingress/ -n banking
