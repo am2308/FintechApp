@@ -18,6 +18,18 @@ spec:
             summary: "{{$labels.app}} is down"
             description: "{{$labels.app}} has been down for more than 1 minute"
 
+    - name: test-alert
+      rules:
+        - alert: TestAlert
+          expr: vector(1)
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Test Alert"
+            description: "This is a test alert to verify configuration."
+
+
     - name: banking-services-alerts 
       rules: 
         # Response Time Alerts
