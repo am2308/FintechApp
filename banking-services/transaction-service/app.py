@@ -36,19 +36,19 @@ Base = declarative_base()
 # Database models
 class AccountModel(Base):
     __tablename__ = "accounts"
-    account_id = Column(String, primary_key=True, index=True)
-    customer_id = Column(String, nullable=False)
-    account_type = Column(String, nullable=False)
-    currency = Column(String, nullable=False)
+    account_id = Column(String(36), primary_key=True, index=True)
+    customer_id = Column(String(50), nullable=False)
+    account_type = Column(String(20), nullable=False)
+    currency = Column(String(3), nullable=False)
     balance = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    status = Column(String, default="ACTIVE")
+    status = Column(String(10), default="ACTIVE")
 
 class TransactionModel(Base):
     __tablename__ = "transactions"
-    transaction_id = Column(String, primary_key=True, index=True)
-    account_id = Column(String, ForeignKey("accounts.account_id"), nullable=False)
-    transaction_type = Column(String, nullable=False)  # 'credit' or 'debit'
+    transaction_id = Column(String(36), primary_key=True, index=True)
+    account_id = Column(String(36), ForeignKey("accounts.account_id"), nullable=False)
+    transaction_type = Column(String(10), nullable=False)  # 'credit' or 'debit'
     amount = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
