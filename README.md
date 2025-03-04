@@ -28,3 +28,5 @@ I will be outlining a detailed solution to migrate this core banking system to A
 📖 This Hybrid Cloud Architecture design emphasises robust network isolation, security, scalability, and operational excellence through a well-structured 4-VPC architecture. 
 Each VPC serves a specific purpose, enhancing modularity and clarity in responsibilities while addressing key pillars of the AWS Well-Architected Framework. 
 This separation follows the principle of least privilege and ensures that security is built into the foundation of the infrastructure.
+
+At first time deployment, you may need to create banking database in mysql using 'mysql -u root -p' and then need to restart the application deployments
