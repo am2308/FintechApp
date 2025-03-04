@@ -51,6 +51,9 @@ jobs:
       - name: Verify AWS Credentials
         run: |
           aws sts get-caller-identity
+      - name: Test aws eks get-token
+        run: |
+          aws eks get-token --cluster-name amcdemo --region ap-south-1
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
