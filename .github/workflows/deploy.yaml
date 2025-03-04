@@ -1,6 +1,7 @@
 name: CI/CD Pipeline for Global Banking App
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feature/k8  # Trigger on pushes to the main
