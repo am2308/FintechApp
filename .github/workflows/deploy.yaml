@@ -48,6 +48,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1  # Change to your EKS region
 
+      - name: Verify AWS Credentials
+        run: |
+          aws sts get-caller-identity
+
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
         with:
@@ -59,9 +63,14 @@ jobs:
           chmod +x ./aws-iam-authenticator
           sudo mv ./aws-iam-authenticator /usr/local/bin/
 
+      - name: Verify aws-iam-authenticator
+        run: |
+          aws-iam-authenticator version
+
       - name: Update kubeconfig for EKS
         run: |
           aws eks update-kubeconfig --region ap-south-1 --name amcdemo
+          cat ~/.kube/config
 
       - name: Apply Kubernetes Manifests
         run: |
