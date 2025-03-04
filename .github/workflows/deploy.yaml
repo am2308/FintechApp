@@ -72,6 +72,11 @@ jobs:
           aws eks update-kubeconfig --region ap-south-1 --name amcdemo
           cat ~/.kube/config
 
+      - name: Debug kubectl
+        run: |
+          kubectl config view
+          kubectl get pods --v=6
+
       - name: Apply Kubernetes Manifests
         run: |
           ls -lart
