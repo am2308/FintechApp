@@ -34,13 +34,13 @@ Base = declarative_base()
 # Database model
 class AccountModel(Base):
     __tablename__ = "accounts"
-    account_id = Column(String, primary_key=True, index=True)
-    customer_id = Column(String, nullable=False)
-    account_type = Column(String, nullable=False)
-    currency = Column(String, nullable=False)
+    account_id = Column(String(36), primary_key=True, index=True)
+    customer_id = Column(String(50), nullable=False)
+    account_type = Column(String(20), nullable=False)
+    currency = Column(String(3), nullable=False)
     balance = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    status = Column(String, default="ACTIVE")
+    status = Column(String(10), default="ACTIVE")
 
 # Create tables
 Base.metadata.create_all(bind=engine)
