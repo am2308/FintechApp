@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feature/k8  # Trigger on pushes to feature/k8 deploy
+      - feature/k8  # Trigger on pushes to feature/k8
 
 jobs:
   build-and-push-docker:
