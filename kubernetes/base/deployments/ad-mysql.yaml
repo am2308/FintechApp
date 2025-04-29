@@ -22,6 +22,8 @@ spec:
         env:
         - name: MYSQL_ROOT_PASSWORD
           value: "account123"
+        - name: MYSQL_DATABASE
+          value: "banking"
           #valueFrom:
           #secretKeyRef:
           #name: mysql-secret
