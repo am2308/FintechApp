@@ -1,20 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth-service
+  name: auth-service-green
   namespace: banking
   labels:
     app: auth-service
+    color: green
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: auth-service
+      color: green
   template:
     metadata:
       labels:
         app: auth-service
-        color: blue
+        color: green
     spec:
       containers:
       - name: auth-service
@@ -24,10 +26,6 @@ spec:
         env:
         - name: MYSQL_ROOT_PASSWORD
           value: "account123"
-          #valueFrom:
-          #  secretKeyRef:
-          #    name: mysql-secret
-          #    key: root-password
         - name: MYSQL_HOST
           value: mysql
         - name: MYSQL_DB

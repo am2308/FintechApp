@@ -4,11 +4,10 @@ metadata:
   name: banking-ingress
   namespace: banking
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: / # Forward paths as-is
+    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   ingressClassName: nginx
   rules:
-  # Host for Account Service
   - host: accounts.demoprojectbc1.com
     http:
       paths:
@@ -19,7 +18,6 @@ spec:
             name: account-service
             port:
               number: 81
-  # Host for Transaction Service
   - host: transaction.demoprojectbc1.com
     http:
       paths:

@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: account-service
+  namespace: banking
   labels:
     app: account-service
 spec:
@@ -13,6 +14,7 @@ spec:
     metadata:
       labels:
         app: account-service
+        color: blue
     spec:
       containers:
       - name: account-service
@@ -45,4 +47,4 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
-              
+

@@ -1,0 +1,110 @@
+name: Blue-Green Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      color:
+        description: "Color to deploy (blue/green)"
+        required: true
+        default: "green"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [account-service, auth-service, transaction-service]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    - name: Build and push image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./banking-services/${{ matrix.service }}
+        file: ./banking-services/${{ matrix.service }}/dockerfile
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    env:
+      KUBE_NAMESPACE: banking
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set color
+      run: echo "DEPLOY_COLOR=${{ github.event.inputs.color || 'green' }}" >> $GITHUB_ENV
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'v1.29.0'
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+    - name: Configure kubeconfig
+      run: |
+        mkdir -p $HOME/.kube
+        echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+    - name: Bootstrap namespace and MySQL (idempotent)
+      run: |
+        # Namespace
+        kubectl apply -f kubernetes/base/namespace.yaml
+        # MySQL Service + StatefulSet
+        kubectl apply -f kubernetes/base/services/mysql.yml
+        kubectl apply -f kubernetes/base/deployments/ad-mysql.yaml
+        # Wait for MySQL ready
+        kubectl -n $KUBE_NAMESPACE rollout status statefulset/mysql --timeout=300s || true
+        kubectl -n $KUBE_NAMESPACE wait --for=condition=ready pod -l app=mysql --timeout=300s
+    - name: Install/upgrade NGINX Ingress Controller (idempotent)
+      run: |
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+        helm repo update
+        helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+          --namespace ingress-nginx \
+          --create-namespace \
+          --set controller.metrics.enabled=true
+        kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=300s
+    - name: Apply Ingress (idempotent)
+      run: |
+        kubectl apply -f kubernetes/ingress/multi-host-ingress.yaml
+    - name: Apply ${DEPLOY_COLOR} deployments
+      run: |
+        kubectl apply -f kubernetes/blue-green/deployments/${DEPLOY_COLOR}/
+    - name: Update deployment images to commit SHA
+      run: |
+        for svc in account-service auth-service transaction-service; do
+          kubectl -n $KUBE_NAMESPACE set image deployment/${svc}-${DEPLOY_COLOR} ${svc}=${{ secrets.DOCKER_USERNAME }}/${svc}:${{ github.sha }};
+        done
+    - name: Wait for rollout
+      run: |
+        for dep in account-service auth-service transaction-service; do
+          kubectl -n $KUBE_NAMESPACE rollout status deployment/${dep}-${DEPLOY_COLOR} --timeout=240s;
+          kubectl -n $KUBE_NAMESPACE wait --for=condition=ready pod -l app=${dep},color=${DEPLOY_COLOR} --timeout=240s;
+        done
+    - name: Smoke tests against new color pods
+      run: |
+        # Test account-service
+        ACC_POD_IP=$(kubectl -n $KUBE_NAMESPACE get pod -l app=account-service,color=${DEPLOY_COLOR} -o jsonpath='{.items[0].status.podIP}')
+        kubectl -n $KUBE_NAMESPACE run curl-${DEPLOY_COLOR}-acct --image=curlimages/curl:8.10.1 --rm -i --restart=Never -- curl -sf http://${ACC_POD_IP}:8081/health
+        # Test auth-service
+        AUTH_POD_IP=$(kubectl -n $KUBE_NAMESPACE get pod -l app=auth-service,color=${DEPLOY_COLOR} -o jsonpath='{.items[0].status.podIP}')
+        kubectl -n $KUBE_NAMESPACE run curl-${DEPLOY_COLOR}-auth --image=curlimages/curl:8.10.1 --rm -i --restart=Never -- curl -sf http://${AUTH_POD_IP}:8082/health
+        # Test transaction-service
+        TX_POD_IP=$(kubectl -n $KUBE_NAMESPACE get pod -l app=transaction-service,color=${DEPLOY_COLOR} -o jsonpath='{.items[0].status.podIP}')
+        kubectl -n $KUBE_NAMESPACE run curl-${DEPLOY_COLOR}-tx --image=curlimages/curl:8.10.1 --rm -i --restart=Never -- curl -sf http://${TX_POD_IP}:8083/health
+    - name: Flip services to ${DEPLOY_COLOR}
+      run: |
+        kubectl apply -f kubernetes/blue-green/services/${DEPLOY_COLOR}/
+    - name: Cleanup other color (optional)
+      if: ${{ env.DEPLOY_COLOR == 'green' }}
+      run: |
+        kubectl delete deployment account-service-blue auth-service-blue transaction-service-blue -n $KUBE_NAMESPACE || true

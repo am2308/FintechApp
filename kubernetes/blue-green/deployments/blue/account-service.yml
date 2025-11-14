@@ -1,45 +1,43 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth-service
+  name: account-service-blue
   namespace: banking
   labels:
-    app: auth-service
+    app: account-service
+    color: blue
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: auth-service
+      app: account-service
+      color: blue
   template:
     metadata:
       labels:
-        app: auth-service
+        app: account-service
         color: blue
     spec:
       containers:
-      - name: auth-service
-        image: akhilmittal510/auth-service:latest
+      - name: account-service
+        image: akhilmittal510/account-service:latest
         ports:
-        - containerPort: 8082
+        - containerPort: 8081
         env:
         - name: MYSQL_ROOT_PASSWORD
           value: "account123"
-          #valueFrom:
-          #  secretKeyRef:
-          #    name: mysql-secret
-          #    key: root-password
         - name: MYSQL_HOST
           value: mysql
         - name: MYSQL_DB
           value: banking
         - name: PYTHONPATH
-          value: "/app/auth-service"
+          value: "/app/account-service"
         - name: OTEL_LOG_LEVEL
           value: DEBUG
         - name: OTEL_EXPORTER_JAEGER_ENDPOINT
           value: "http://jaeger-collector.tracing:14268/api/traces"
         - name: OTEL_SERVICE_NAME
-          value: "auth-service"
+          value: "account-service"
         resources:
           requests:
             memory: "256Mi"

@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: transaction-service
+  namespace: banking
   labels:
     app: transaction-service
 spec:
@@ -13,6 +14,7 @@ spec:
     metadata:
       labels:
         app: transaction-service
+        color: blue
     spec:
       containers:
       - name: transaction-service
