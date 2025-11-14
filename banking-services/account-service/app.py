@@ -13,6 +13,10 @@ from sqlalchemy.orm import sessionmaker
 import os
 from fastapi.responses import HTMLResponse
 from fastapi import Form
+from fastapi import FastAPI, Form, Depends, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.requests import Request
 
 # Secret key (should be loaded from environment or secrets)
 JWT_SECRET = "sample_secret"  # Same secret used in auth-service
@@ -58,7 +62,7 @@ class AccountResponse(AccountBase):
     status: str
 
 app = FastAPI()
-
+templates = Jinja2Templates(directory="templates")
 app.add_middleware(MetricsMiddleware, app_name="account-service")
 
 metrics_app = make_asgi_app()
@@ -76,79 +80,13 @@ def get_db():
 
 
 @app.get("/accounts", response_class=HTMLResponse)
-async def render_account_form():
+async def render_account_form(request: Request):
     """Render an HTML form to collect account details."""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Create Account</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 20px;
-                background-color: #f4f4f4;
-            }
-            form {
-                background: #ffffff;
-                padding: 20px;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                max-width: 400px;
-                margin: auto;
-            }
-            input, select, button {
-                display: block;
-                width: 100%;
-                margin-bottom: 15px;
-                padding: 10px;
-                border-radius: 4px;
-                border: 1px solid #ccc;
-            }
-            button {
-                background-color: #28a745;
-                color: white;
-                font-size: 16px;
-                border: none;
-                cursor: pointer;
-            }
-            button:hover {
-                background-color: #218838;
-            }
-        </style>
-    </head>
-    <body>
-        <h1>Create a New Account</h1>
-        <form action="/accounts" method="post">
-            <label for="customer_id">Customer ID:</label>
-            <input type="text" id="customer_id" name="customer_id" required>
-
-            <label for="account_type">Account Type:</label>
-            <select id="account_type" name="account_type" required>
-                <option value="savings">Savings</option>
-                <option value="current">Current</option>
-                <option value="business">Business</option>
-            </select>
-
-            <label for="currency">Currency:</label>
-            <select id="currency" name="currency" required>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="INR">INR</option>
-            </select>
-
-            <label for="balance">Balance:</label>
-            <input type="number" id="balance" name="balance" step="0.01" required>
-
-            <button type="submit">Create Account</button>
-        </form>
-    </body>
-    </html>
-    """
+    return templates.TemplateResponse("create_account.html", {"request": request})
 
 @app.post("/accounts", response_class=HTMLResponse)
 async def create_account_via_form(
+    request: Request,
     customer_id: str = Form(...),
     account_type: str = Form(...),
     currency: str = Form(...),
@@ -174,149 +112,40 @@ async def create_account_via_form(
     db.refresh(account_data)
 
     # Return success message
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Account Created</title>
-    </head>
-    <body>
-        <h1>Account Created Successfully!</h1>
-        <p><strong>Customer ID:</strong> {customer_id}</p>
-        <p><strong>Status:</strong> {account_data.status}</p>
-        <a href="/accounts">Create Another Account</a>
-    </body>
-    </html>
-    """
+    return templates.TemplateResponse(
+        "account_created.html",
+        {
+            "request": request,
+            "customer_id": customer_id,
+            "status": account_data.status,
+        },
+    )
 
 
 # HTML Form to collect `customer_id`
 @app.get("/account-details", response_class=HTMLResponse)
-async def render_customer_id_form():
+async def render_customer_id_form(request: Request):
     """Render an HTML form to collect customer_id."""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Account Details</title>
-        <style>
-            body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px; }
-            form { background: #fff; padding: 20px; border-radius: 5px; max-width: 400px; margin: auto; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
-            label, input { display: block; width: 100%; margin-bottom: 10px; }
-            input { padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 3px; }
-            button { background: #007bff; color: white; padding: 10px; border: none; border-radius: 3px; cursor: pointer; }
-            button:hover { background: #0056b3; }
-        </style>
-    </head>
-    <body>
-        <h1>Search Account by Customer ID</h1>
-        <form action="/account-details" method="post">
-            <label for="customer_id">Customer ID:</label>
-            <input type="text" id="customer_id" name="customer_id" required>
-            <button type="submit">Search</button>
-        </form>
-    </body>
-    </html>
-    """
+    return templates.TemplateResponse("search_account.html", {"request": request})
 
 # Fetch and display account details based on `customer_id`
 @app.post("/account-details", response_class=HTMLResponse)
-async def get_account_details(customer_id: str = Form(...), db=Depends(get_db)):
+async def get_account_details(request: Request, customer_id: str = Form(...), db=Depends(get_db)):
     """Fetch and display account details for a given customer_id."""
     # Query the database for the provided customer_id
     accounts = db.query(AccountModel).filter(AccountModel.customer_id == customer_id).all()
 
     if not accounts:
-        return HTMLResponse(content=f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>No Accounts Found</title>
-        </head>
-        <body>
-            <h1>No Accounts Found</h1>
-            <p>No account details found for the provided Customer ID: {customer_id}</p>
-            <a href="/account-details">Search Again</a>
-        </body>
-        </html>
-        """)
+        return templates.TemplateResponse(
+            "account_details.html",
+            {"request": request, "accounts": None, "customer_id": customer_id},
+        )
 
     # Use raw string for HTML to avoid `format()` conflicts
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Account Details</title>
-        <style>
-            body {{
-                font-family: Arial, sans-serif;
-                background-color: #f4f4f4;
-                margin: 0;
-                padding: 20px;
-            }}
-            table {{
-                width: 100%;
-                border-collapse: collapse;
-                background: #fff;
-                margin: 20px 0;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            }}
-            th, td {{
-                border: 1px solid #ddd;
-                padding: 12px;
-                text-align: left;
-            }}
-            th {{
-                background-color: #007bff;
-                color: white;
-            }}
-            tr:nth-child(even) {{
-                background-color: #f9f9f9;
-            }}
-            tr:hover {{
-                background-color: #f1f1f1;
-            }}
-        </style>
-    </head>
-    <body>
-        <h1>Account Details for Customer ID: {customer_id}</h1>
-        <table>
-            <thead>
-                <tr>
-                    <th>Account ID</th>
-                    <th>Customer ID</th>
-                    <th>Account Type</th>
-                    <th>Currency</th>
-                    <th>Balance</th>
-                    <th>Created At</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-    """
-
-    for account in accounts:
-        html_content += f"""
-            <tr>
-                <td>{account.account_id}</td>
-                <td>{account.customer_id}</td>
-                <td>{account.account_type}</td>
-                <td>{account.currency}</td>
-                <td>{account.balance}</td>
-                <td>{account.created_at}</td>
-                <td>{account.status}</td>
-            </tr>
-        """
-
-    html_content += """
-            </tbody>
-        </table>
-        <a href="/account-details">Search Another Customer</a>
-    </body>
-    </html>
-    """
-
-    return HTMLResponse(content=html_content)
+    return templates.TemplateResponse(
+        "account_details.html",
+        {"request": request, "accounts": accounts, "customer_id": customer_id},
+    )
 
 
 @app.get("/health")

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Account Details</title>
+</head>
+<body>
+    {% if accounts %}
+    <h1>Account Details for Customer ID: {{ customer_id }}</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Account ID</th>
+                <th>Account Type</th>
+                <th>Currency</th>
+                <th>Balance</th>
+                <th>Created At</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for account in accounts %}
+            <tr>
+                <td>{{ account.account_id }}</td>
+                <td>{{ account.account_type }}</td>
+                <td>{{ account.currency }}</td>
+                <td>{{ account.balance }}</td>
+                <td>{{ account.created_at }}</td>
+                <td>{{ account.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <h1>No Accounts Found for Customer ID: {{ customer_id }}</h1>
+    {% endif %}
+    <a href="/account-details">Search Another Customer</a>
+</body>
+</html>
