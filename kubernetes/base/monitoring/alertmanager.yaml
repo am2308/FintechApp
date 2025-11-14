@@ -1,0 +1,36 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname']
+  group_interval: 5m
+  repeat_interval: 1h
+  receiver: webhook
+  routes:
+        # Route for critical alerts (to both webhook and Slack)
+    - match:
+        severity: critical
+      receiver: webhook
+    - match:
+        severity: critical
+      receiver: slack
+        
+        # Route for all other alerts
+    - match_re:
+        alertname: ".*"
+      receiver: webhook
+    
+receivers:
+  - name: webhook
+    webhook_configs:
+      - url: 'https://jqqsjk2vdf.execute-api.ap-south-1.amazonaws.com/dev/prometheus-alerts'
+
+  - name: slack
+    slack_configs:
+      - send_resolved: true
+        api_url: 'https://hooks.slack.com/services/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'
+        channel: '#deploy-prod-approval'
+        text: |-
+          *Alert:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Severity:* {{ .CommonLabels.severity }}

@@ -11,6 +11,7 @@ spec:
   type: NodePort
   selector: 
     app: account-service
+    color: blue
   ports:
     - name: http
       port: 81
@@ -31,6 +32,7 @@ spec:
   type: NodePort
   selector: 
     app: transaction-service
+    color: blue
   ports:
     - name: http
       port: 83
@@ -51,28 +53,9 @@ spec:
   type: ClusterIP
   selector: 
     app: auth-service
+    color: blue
   ports:
     - name: http
       port: 82
       targetPort: 8082
-      protocol: TCP
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mysql
-  namespace: banking
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "3306"
-    prometheus.io/path: "/metrics"
-spec:
-  type: ClusterIP
-  selector: 
-    app: mysql
-  ports:
-    - name: mysql
-      port: 3306
-      targetPort: 3306
       protocol: TCP

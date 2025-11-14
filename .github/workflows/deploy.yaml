@@ -1,9 +1,10 @@
 name: CI/CD Pipeline for Global Banking App
 
 on:
+  workflow_dispatch:
   push:
     branches:
-      - feature/k8  # Trigger on pushes to the main branch to deploy
+      - main  # Trigger on pushes to the main branch to deploy
 
 jobs:
   build-and-push-docker:
@@ -12,7 +13,7 @@ jobs:
     strategy:
       matrix:
         service:
-          - account-service  # Replace with actual service names in the `banking-services` folder
+          - account-service  # Replace with actual service names in the `banking-services`
           - auth-service
           - transaction-service
     steps:
@@ -30,7 +31,7 @@ jobs:
           ls -lart
           cd banking-services
           ls -lart
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:latest -f ${{ matrix.service }}/dockerfile .
+          docker build --no-cache -t ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:latest -f ${{ matrix.service }}/dockerfile .
           docker push ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:latest
 
   deploy-to-eks:
@@ -48,26 +49,50 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1  # Change to your EKS region
 
+      - name: Verify AWS Credentials
+        run: |
+          aws sts get-caller-identity
+      - name: Test aws eks get-token
+        run: |
+          aws eks get-token --cluster-name amcdemo --region ap-south-1
+
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
         with:
           version: 'latest'
 
+      - name: Install aws-iam-authenticator
+        run: |
+          curl -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/latest/download/aws-iam-authenticator_linux_amd64
+          chmod +x ./aws-iam-authenticator
+          sudo mv ./aws-iam-authenticator /usr/local/bin/
+
+      - name: Verify aws-iam-authenticator
+        run: |
+          file /usr/local/bin/aws-iam-authenticator
+
       - name: Update kubeconfig for EKS
         run: |
           aws eks update-kubeconfig --region ap-south-1 --name amcdemo
+          cat ~/.kube/config
+
+      - name: Debug kubectl
+        run: |
+          kubectl config view
+          kubectl get pods --v=6
 
       - name: Apply Kubernetes Manifests
         run: |
           ls -lart
-          kubectl create ns banking
+          kubectl get pods -A
+          kubectl create namespace banking --dry-run=client -o yaml | kubectl apply -f -
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
-          helm install nginx-ingress ingress-nginx/ingress-nginx --namespace ingress-nginx --create-namespace
+          helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --namespace ingress-nginx --create-namespace
           kubectl apply -f kubernetes/config/pv.yaml -n banking
           kubectl apply -f kubernetes/secrets/mysql-secret.yml -n banking
           kubectl apply -f kubernetes/base/deployments/ -n banking
-          kubectl apply -k kubernetes/base/services/ -n banking
-          kubectl apply -k kubernetes/base/ingress/ -n banking
+          kubectl apply -f kubernetes/base/services/ -n banking
+          kubectl apply -f kubernetes/ingress/ -n banking
           
           
