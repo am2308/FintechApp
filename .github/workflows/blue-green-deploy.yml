@@ -4,11 +4,6 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-    inputs:
-      color:
-        description: "Color to deploy (blue/green)"
-        required: true
-        default: "green"
 
 jobs:
   build-and-push:
@@ -42,8 +37,6 @@ jobs:
       KUBE_NAMESPACE: banking
     steps:
     - uses: actions/checkout@v4
-    - name: Set color
-      run: echo "DEPLOY_COLOR=${{ github.event.inputs.color || 'green' }}" >> $GITHUB_ENV
     - name: Install kubectl
       uses: azure/setup-kubectl@v4
       with:
@@ -76,6 +69,25 @@ jobs:
     - name: Apply Ingress (idempotent)
       run: |
         kubectl apply -f kubernetes/ingress/multi-host-ingress.yaml
+    - name: Determine target color (auto)
+      shell: bash
+      run: |
+        set -e
+        ACTIVE_COLOR=$(kubectl -n $KUBE_NAMESPACE get svc account-service -o jsonpath='{.spec.selector.color}' 2>/dev/null || true)
+        if [ -z "$ACTIVE_COLOR" ]; then
+          echo "No active color detected; defaulting to green."
+          echo "ACTIVE_COLOR=none" >> $GITHUB_ENV
+          echo "DEPLOY_COLOR=green" >> $GITHUB_ENV
+          echo "OTHER_COLOR=blue" >> $GITHUB_ENV
+        elif [ "$ACTIVE_COLOR" = "blue" ]; then
+          echo "ACTIVE_COLOR=blue" >> $GITHUB_ENV
+          echo "DEPLOY_COLOR=green" >> $GITHUB_ENV
+          echo "OTHER_COLOR=blue" >> $GITHUB_ENV
+        else
+          echo "ACTIVE_COLOR=green" >> $GITHUB_ENV
+          echo "DEPLOY_COLOR=blue" >> $GITHUB_ENV
+          echo "OTHER_COLOR=green" >> $GITHUB_ENV
+        fi
     - name: Apply ${DEPLOY_COLOR} deployments
       run: |
         kubectl apply -f kubernetes/blue-green/deployments/${DEPLOY_COLOR}/
@@ -105,6 +117,5 @@ jobs:
       run: |
         kubectl apply -f kubernetes/blue-green/services/${DEPLOY_COLOR}/
     - name: Cleanup other color (optional)
-      if: ${{ env.DEPLOY_COLOR == 'green' }}
       run: |
-        kubectl delete deployment account-service-blue auth-service-blue transaction-service-blue -n $KUBE_NAMESPACE || true
+        kubectl delete deployment account-service-${OTHER_COLOR} auth-service-${OTHER_COLOR} transaction-service-${OTHER_COLOR} -n $KUBE_NAMESPACE || true
