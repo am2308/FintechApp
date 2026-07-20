@@ -132,23 +132,34 @@ jobs:
       - name: Determine current active / inactive slot
         id: determine
         run: |
-          CURRENT=$(helm get values ${{ env.RELEASE_NAME }} -n ${{ env.NAMESPACE }} -o json 2>/dev/null | jq -r '.activeSlot // "blue"')
-          if [ "$CURRENT" = "blue" ]; then INACTIVE="green"; else INACTIVE="blue"; fi
-          echo "Current active slot: $CURRENT — deploying new images to: $INACTIVE"
-          echo "inactive_slot=$INACTIVE" >> "$GITHUB_OUTPUT"
+          if helm status ${{ env.RELEASE_NAME }} -n ${{ env.NAMESPACE }} >/dev/null 2>&1; then
+            # Release already exists — normal blue/green targeting
+            CURRENT=$(helm get values ${{ env.RELEASE_NAME }} -n ${{ env.NAMESPACE }} -o json | jq -r '.activeSlot')
+            if [ "$CURRENT" = "blue" ]; then INACTIVE="green"; else INACTIVE="blue"; fi
+              echo "Existing release — active: $CURRENT, deploying to inactive: $INACTIVE"
+              echo "inactive_slot=$INACTIVE" >> "$GITHUB_OUTPUT"
+              echo "bootstrap=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No existing release — first install, bootstrapping both slots"
+            echo "bootstrap=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Deploy new image tag to the inactive slot ONLY
+      - name: Deploy (bootstrap or normal)
         run: |
-          helm upgrade --install ${{ env.RELEASE_NAME }} ./banking-app \
-            -n ${{ env.NAMESPACE }} --create-namespace \
-            --reuse-values \
+          if [ "${{ steps.determine.outputs.bootstrap }}" = "true" ]; then
+            helm upgrade --install ${{ env.RELEASE_NAME }} ./banking-app -n ${{ env.NAMESPACE }} --create-namespace \
             --set image.registry=${{ env.REGISTRY }}/${{ env.DOCKERHUB_NAMESPACE }} \
+            --set services.account.blueTag=${{ env.IMAGE_TAG }} --set services.account.greenTag=${{ env.IMAGE_TAG }} \
+            --set services.auth.blueTag=${{ env.IMAGE_TAG }} --set services.auth.greenTag=${{ env.IMAGE_TAG }} \
+            --set services.transaction.blueTag=${{ env.IMAGE_TAG }} --set services.transaction.greenTag=${{ env.IMAGE_TAG }} \
+            --wait --timeout 5m
+          else
+            helm upgrade --install ${{ env.RELEASE_NAME }} ./banking-app -n ${{ env.NAMESPACE }} --reuse-values \
             --set services.account.${{ steps.determine.outputs.inactive_slot }}Tag=${{ env.IMAGE_TAG }} \
             --set services.auth.${{ steps.determine.outputs.inactive_slot }}Tag=${{ env.IMAGE_TAG }} \
             --set services.transaction.${{ steps.determine.outputs.inactive_slot }}Tag=${{ env.IMAGE_TAG }} \
             --wait --timeout 5m
-          # Note: the ACTIVE slot's Deployments are untouched by this command —
-          # --reuse-values keeps their existing tags exactly as they were.
+          fi
 
   # ── Smoke-test the new slot DIRECTLY, before it receives any real traffic ──
   smoke-test-inactive-slot:
