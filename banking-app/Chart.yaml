@@ -1,0 +1,16 @@
+apiVersion: v2
+name: banking-app
+description: >
+  Helm chart for the FintechApp banking microservices (account-service,
+  auth-service, transaction-service) plus MySQL, with built-in blue-green
+  deployment support via a per-slot image tag and a stable, selector-switched
+  Service in front of each microservice.
+type: application
+version: 0.1.0        # chart version — bump this whenever templates/values.yaml structure changes
+appVersion: "1.0.0"   # informational only — the real running version is per-service image tags below
+keywords:
+  - banking
+  - fintech
+  - blue-green
+maintainers:
+  - name: FintechApp Team

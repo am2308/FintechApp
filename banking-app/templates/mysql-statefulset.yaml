@@ -1,0 +1,59 @@
+# One consolidated MySQL StatefulSet — the raw manifests this chart replaces
+# had TWO conflicting StatefulSet definitions both named `mysql` in the same
+# folder (one with --skip-grant-tables, a real security bug). This template
+# is the single source of truth going forward.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "banking-app.labels" . | nindent 4 }}
+    app: mysql
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels: { app: mysql }
+  template:
+    metadata:
+      labels: { app: mysql }
+    spec:
+      containers:
+        - name: mysql
+          image: {{ .Values.mysql.image }}
+          ports:
+            - containerPort: 3306
+              name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mysql.rootPasswordSecretName }}
+                  key: {{ .Values.mysql.rootPasswordSecretKey }}
+            - name: MYSQL_DATABASE
+              value: banking
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+          readinessProbe:
+            exec: { command: ["mysqladmin", "ping", "-h", "localhost"] }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata: { name: mysql-data }
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: { storage: {{ .Values.mysql.storage }} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: {{ .Values.namespace }}
+spec:
+  selector: { app: mysql }
+  ports:
+    - port: 3306
+  clusterIP: None   # headless — StatefulSets address their pod directly by ordinal

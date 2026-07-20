@@ -1,0 +1,175 @@
+# Blue-Green deployment for the FintechApp banking microservices, via Helm.
+#
+# Flow: build & push images -> package & push the Helm chart (OCI) ->
+# deploy the new image to the INACTIVE slot only -> smoke-test that slot
+# directly -> flip the stable Service to the new slot (the actual cutover,
+# gated behind manual approval) -> (separate, later job) scale the old slot
+# down once you're confident, keeping it as an instant-rollback target
+# until then.
+
+name: Helm Blue-Green Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      rollback_to:
+        description: "Set to 'blue' or 'green' to force-activate that slot instead of deploying"
+        required: false
+        type: string
+
+env:
+  REGISTRY: docker.io
+  DOCKERHUB_NAMESPACE: ${{ secrets.DOCKERHUB_USERNAME }}
+  CHART_REGISTRY: oci://ghcr.io/${{ github.repository_owner }}/charts
+  IMAGE_TAG: ${{ github.sha }}
+  NAMESPACE: banking
+  RELEASE_NAME: banking-app
+
+jobs:
+  # ── Build & push all 3 service images, tagged with the commit SHA ──
+  build-and-push:
+    if: github.event.inputs.rollback_to == ''
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [account, auth, transaction]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build & push ${{ matrix.service }}-service
+        uses: docker/build-push-action@v5
+        with:
+          context: banking-services
+          file: banking-services/${{ matrix.service }}-service/dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.DOCKERHUB_NAMESPACE }}/${{ matrix.service }}-service:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Package the Helm chart itself and push it to an OCI registry (GHCR) ──
+  package-and-push-chart:
+    if: github.event.inputs.rollback_to == ''
+    name: Package & Push Helm Chart
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.15.0
+
+      - name: Lint the chart
+        run: helm lint ./banking-app
+
+      - name: Log in to GHCR (OCI registry) for chart storage
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Package chart
+        run: helm package ./banking-app --version 0.1.${{ github.run_number }} --app-version ${{ env.IMAGE_TAG }}
+
+      - name: Push chart to GHCR
+        run: helm push banking-app-0.1.${{ github.run_number }}.tgz ${{ env.CHART_REGISTRY }}
+
+  # ── Determine which slot is currently INACTIVE, deploy the new images there only ──
+  deploy-inactive-slot:
+    if: github.event.inputs.rollback_to == ''
+    name: Deploy New Version to Inactive Slot
+    needs: package-and-push-chart
+    runs-on: [self-hosted, banking-app-deploy]
+    outputs:
+      inactive_slot: ${{ steps.determine.outputs.inactive_slot }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with: { version: v3.15.0 }
+
+      - name: Determine current active / inactive slot
+        id: determine
+        run: |
+          CURRENT=$(helm get values ${{ env.RELEASE_NAME }} -n ${{ env.NAMESPACE }} -o json 2>/dev/null | jq -r '.activeSlot // "blue"')
+          if [ "$CURRENT" = "blue" ]; then INACTIVE="green"; else INACTIVE="blue"; fi
+          echo "Current active slot: $CURRENT — deploying new images to: $INACTIVE"
+          echo "inactive_slot=$INACTIVE" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy new image tag to the inactive slot ONLY
+        run: |
+          helm upgrade --install ${{ env.RELEASE_NAME }} ./banking-app \
+            -n ${{ env.NAMESPACE }} --create-namespace \
+            --reuse-values \
+            --set image.registry=${{ env.REGISTRY }}/${{ env.DOCKERHUB_NAMESPACE }} \
+            --set services.account.${{ steps.determine.outputs.inactive_slot }}Tag=${{ env.IMAGE_TAG }} \
+            --set services.auth.${{ steps.determine.outputs.inactive_slot }}Tag=${{ env.IMAGE_TAG }} \
+            --set services.transaction.${{ steps.determine.outputs.inactive_slot }}Tag=${{ env.IMAGE_TAG }} \
+            --wait --timeout 5m
+          # Note: the ACTIVE slot's Deployments are untouched by this command —
+          # --reuse-values keeps their existing tags exactly as they were.
+
+  # ── Smoke-test the new slot DIRECTLY, before it receives any real traffic ──
+  smoke-test-inactive-slot:
+    name: Smoke Test Inactive Slot
+    needs: deploy-inactive-slot
+    runs-on: [self-hosted, banking-app-deploy]
+    steps:
+      - name: Hit the slot-specific Service directly (not the stable one)
+        run: |
+          SLOT=${{ needs.deploy-inactive-slot.outputs.inactive_slot }}
+          kubectl port-forward -n ${{ env.NAMESPACE }} svc/account-service-$SLOT 18081:8081 &
+          PF_PID=$!
+          sleep 3
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:18081/health; then echo "account-service ($SLOT) healthy"; kill $PF_PID; exit 0; fi
+            sleep 5
+          done
+          kill $PF_PID
+          echo "Inactive slot failed health check — NOT proceeding to cutover"
+          exit 1
+
+  # ── Cutover — gated behind a required-reviewer GitHub Environment ──
+  cutover:
+    name: Cut Traffic Over to New Slot
+    needs: [deploy-inactive-slot, smoke-test-inactive-slot]
+    runs-on: [self-hosted, banking-app-deploy]
+    environment: production   # attach required reviewers here in repo settings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with: { version: v3.15.0 }
+
+      - name: Flip the stable Service to the new slot
+        run: |
+          helm upgrade ${{ env.RELEASE_NAME }} ./banking-app \
+            -n ${{ env.NAMESPACE }} --reuse-values \
+            --set activeSlot=${{ needs.deploy-inactive-slot.outputs.inactive_slot }}
+
+      - name: Confirm the stable endpoint is now serving the new version
+        run: |
+          kubectl port-forward -n ${{ env.NAMESPACE }} svc/account-service 18080:8081 &
+          PF_PID=$!
+          sleep 3
+          curl -sf http://localhost:18080/health
+          kill $PF_PID
+
+  # ── Manual rollback path — instant, no rebuild, no redeploy ──
+  rollback:
+    name: Rollback (manual trigger only)
+    if: github.event.inputs.rollback_to != ''
+    runs-on: [self-hosted, banking-app-deploy]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with: { version: v3.15.0 }
+      - name: Flip activeSlot back
+        run: |
+          helm upgrade ${{ env.RELEASE_NAME }} ./banking-app \
+            -n ${{ env.NAMESPACE }} --reuse-values \
+            --set activeSlot=${{ github.event.inputs.rollback_to }}

@@ -1,0 +1,69 @@
+{{- range $svcName, $svc := .Values.services }}
+{{- range $slot := list "blue" "green" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $svcName }}-service-{{ $slot }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- include "banking-app.labels" $ | nindent 4 }}
+    app: {{ $svcName }}-service
+    slot: {{ $slot }}
+spec:
+  # Only the ACTIVE slot needs to be at full replica count in a strict
+  # cost-conscious setup; here we keep both slots at the configured replica
+  # count so green is already warm and fully scaled before cutover — the
+  # whole point of blue-green is that cutover is instant, which only holds
+  # if green is already running at production capacity beforehand.
+  replicas: {{ $svc.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $svcName }}-service
+      slot: {{ $slot }}
+  template:
+    metadata:
+      labels:
+        app: {{ $svcName }}-service
+        slot: {{ $slot }}
+    spec:
+      serviceAccountName: banking-service-account
+      containers:
+        - name: {{ $svcName }}-service
+          image: "{{ $.Values.image.registry }}/{{ $svcName }}-service:{{ if eq $slot "blue" }}{{ $svc.blueTag }}{{ else }}{{ $svc.greenTag }}{{ end }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $svc.port }}
+              name: http
+          env:
+            - name: MYSQL_HOST
+              value: mysql
+            - name: MYSQL_DB
+              value: banking
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.mysql.rootPasswordSecretName }}
+                  key: {{ $.Values.mysql.rootPasswordSecretKey }}
+            {{- if eq $svcName "transaction" }}
+            # Single source of truth for the auth-service port — templated
+            # directly from values.yaml instead of hand-typed in two places,
+            # which is exactly what caused the real AUTH_PORT/Service-port
+            # mismatch bug in the original raw manifests.
+            - name: AUTH_HOST
+              value: auth-service
+            - name: AUTH_PORT
+              value: "{{ $.Values.services.auth.port }}"
+            {{- end }}
+          readinessProbe:
+            httpGet: { path: /health, port: {{ $svc.port }} }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: {{ $svc.port }} }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml $svc.resources | nindent 12 }}
+---
+{{- end }}
+{{- end }}

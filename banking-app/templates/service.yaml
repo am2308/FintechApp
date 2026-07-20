@@ -1,0 +1,62 @@
+{{- range $svcName, $svc := .Values.services }}
+# ── Stable Service — this is the ONE other services / Ingress ever talk to.
+# Its selector's `slot` value is the entire blue-green cutover mechanism:
+# flipping .Values.activeSlot and running `helm upgrade` re-renders this
+# selector to point at the other slot's pods. No pods restart, no image
+# changes — just an endpoint re-target, which is why cutover is near-instant.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svcName }}-service
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- include "banking-app.labels" $ | nindent 4 }}
+    app: {{ $svcName }}-service
+spec:
+  selector:
+    app: {{ $svcName }}-service
+    slot: {{ $.Values.activeSlot }}
+  ports:
+    - port: {{ $svc.port }}
+      targetPort: {{ $svc.port }}
+      name: http
+  type: ClusterIP
+---
+# ── Slot-specific Services — fixed to one slot regardless of which is
+# active. Used by the CI/CD smoke-test step to talk directly to the newly
+# deployed (inactive) slot BEFORE flipping the stable Service above.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svcName }}-service-blue
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- include "banking-app.labels" $ | nindent 4 }}
+spec:
+  selector:
+    app: {{ $svcName }}-service
+    slot: blue
+  ports:
+    - port: {{ $svc.port }}
+      targetPort: {{ $svc.port }}
+      name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svcName }}-service-green
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- include "banking-app.labels" $ | nindent 4 }}
+spec:
+  selector:
+    app: {{ $svcName }}-service
+    slot: green
+  ports:
+    - port: {{ $svc.port }}
+      targetPort: {{ $svc.port }}
+      name: http
+  type: ClusterIP
+---
+{{- end }}
