@@ -20,7 +20,7 @@ activeSlot: blue   # blue | green
 services:
   account:
     port: 8081
-    replicas: 2
+    replicas: 1
     blueTag: "stable"
     greenTag: "stable"
     resources:
@@ -28,7 +28,7 @@ services:
       limits:   { cpu: 500m, memory: 512Mi }
   auth:
     port: 8082
-    replicas: 2
+    replicas: 1
     blueTag: "stable"
     greenTag: "stable"
     resources:
@@ -36,7 +36,7 @@ services:
       limits:   { cpu: 500m, memory: 512Mi }
   transaction:
     port: 8083
-    replicas: 2
+    replicas: 1
     blueTag: "stable"
     greenTag: "stable"
     resources:
@@ -56,6 +56,6 @@ ingress:
 
 autoscaling:
   enabled: true
-  minReplicas: 2
-  maxReplicas: 6
+  minReplicas: 1
+  maxReplicas: 2
   targetCPUUtilizationPercentage: 70
