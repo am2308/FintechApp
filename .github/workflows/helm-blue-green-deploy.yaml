@@ -10,8 +10,6 @@
 name: Helm Blue-Green Deploy
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       rollback_to:
@@ -84,13 +82,52 @@ jobs:
     if: github.event.inputs.rollback_to == ''
     name: Deploy New Version to Inactive Slot
     needs: package-and-push-chart
-    runs-on: [self-hosted, banking-app-deploy]
+    runs-on: ubuntu-latest
     outputs:
       inactive_slot: ${{ steps.determine.outputs.inactive_slot }}
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
         with: { version: v3.15.0 }
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1  # Change to your EKS region
+
+      - name: Verify AWS Credentials
+        run: |
+          aws sts get-caller-identity
+      - name: Test aws eks get-token
+        run: |
+          aws eks get-token --cluster-name amcdemo --region ap-south-1
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Install aws-iam-authenticator
+        run: |
+          curl -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/latest/download/aws-iam-authenticator_linux_amd64
+          chmod +x ./aws-iam-authenticator
+          sudo mv ./aws-iam-authenticator /usr/local/bin/
+
+      - name: Verify aws-iam-authenticator
+        run: |
+          file /usr/local/bin/aws-iam-authenticator
+
+      - name: Update kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig --region ap-south-1 --name amcdemo
+          cat ~/.kube/config
+
+      - name: Debug kubectl
+        run: |
+          kubectl config view
+          kubectl get pods --v=6
 
       - name: Determine current active / inactive slot
         id: determine
@@ -117,7 +154,7 @@ jobs:
   smoke-test-inactive-slot:
     name: Smoke Test Inactive Slot
     needs: deploy-inactive-slot
-    runs-on: [self-hosted, banking-app-deploy]
+    runs-on: ubuntu-latest
     steps:
       - name: Hit the slot-specific Service directly (not the stable one)
         run: |
@@ -137,7 +174,7 @@ jobs:
   cutover:
     name: Cut Traffic Over to New Slot
     needs: [deploy-inactive-slot, smoke-test-inactive-slot]
-    runs-on: [self-hosted, banking-app-deploy]
+    runs-on: ubuntu-latest
     environment: production   # attach required reviewers here in repo settings
     steps:
       - uses: actions/checkout@v4
@@ -162,7 +199,7 @@ jobs:
   rollback:
     name: Rollback (manual trigger only)
     if: github.event.inputs.rollback_to != ''
-    runs-on: [self-hosted, banking-app-deploy]
+    runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
