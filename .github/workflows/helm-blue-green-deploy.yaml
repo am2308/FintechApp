@@ -71,7 +71,7 @@ jobs:
         run: helm lint ./banking-app
 
       - name: Log in to GHCR (OCI registry) for chart storage
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+        run: echo "${{ secrets.TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Package chart
         run: helm package ./banking-app --version 0.1.${{ github.run_number }} --app-version ${{ env.IMAGE_TAG }}
