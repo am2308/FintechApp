@@ -54,14 +54,14 @@ spec:
             - name: AUTH_PORT
               value: "{{ $.Values.services.auth.port }}"
             {{- end }}
-          readinessProbe:
-            httpGet: { path: /health, port: {{ $svc.port }} }
-            initialDelaySeconds: 5
-            periodSeconds: 5
-          livenessProbe:
-            httpGet: { path: /health, port: {{ $svc.port }} }
-            initialDelaySeconds: 15
-            periodSeconds: 10
+          # readinessProbe:
+          #   httpGet: { path: /health, port: {{ $svc.port }} }
+          #   initialDelaySeconds: 5
+          #   periodSeconds: 5
+          # livenessProbe:
+          #   httpGet: { path: /health, port: {{ $svc.port }} }
+          #   initialDelaySeconds: 15
+          #   periodSeconds: 10
           resources:
             {{- toYaml $svc.resources | nindent 12 }}
 ---

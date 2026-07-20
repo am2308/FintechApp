@@ -4,7 +4,7 @@
 namespace: banking
 
 image:
-  registry: docker.io/<dockerhub-namespace>   # e.g. docker.io/amit2308
+  registry: docker.io/akhilmittal510   # e.g. docker.io/amit2308
   pullPolicy: IfNotPresent
 
 # ── Blue-green control ──
@@ -20,7 +20,7 @@ activeSlot: blue   # blue | green
 services:
   account:
     port: 8081
-    replicas: 2
+    replicas: 1
     blueTag: "stable"
     greenTag: "stable"
     resources:
@@ -28,7 +28,7 @@ services:
       limits:   { cpu: 500m, memory: 512Mi }
   auth:
     port: 8082
-    replicas: 2
+    replicas: 1
     blueTag: "stable"
     greenTag: "stable"
     resources:
@@ -36,7 +36,7 @@ services:
       limits:   { cpu: 500m, memory: 512Mi }
   transaction:
     port: 8083
-    replicas: 2
+    replicas: 1
     blueTag: "stable"
     greenTag: "stable"
     resources:
@@ -52,10 +52,10 @@ mysql:
 ingress:
   enabled: true
   className: nginx
-  host: banking.example.com
+  host: demoprojectbc1.com
 
 autoscaling:
   enabled: true
-  minReplicas: 2
-  maxReplicas: 6
+  minReplicas: 1
+  maxReplicas: 2
   targetCPUUtilizationPercentage: 70
