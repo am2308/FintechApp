@@ -1,0 +1,18 @@
+banking-app deployed.
+
+Active slot: {{ .Values.activeSlot }}
+
+Stable service endpoints (always follow the active slot):
+{{- range $svcName, $svc := .Values.services }}
+  {{ $svcName }}-service.{{ $.Values.namespace }}.svc.cluster.local:{{ $svc.port }}
+{{- end }}
+
+To check what's actually running on each slot:
+  kubectl get deployments -n {{ .Values.namespace }} -l app.kubernetes.io/part-of=banking-app
+
+To test the INACTIVE slot directly before cutover:
+  kubectl port-forward -n {{ .Values.namespace }} svc/account-service-{{ if eq .Values.activeSlot "blue" }}green{{ else }}blue{{ end }} 8081:{{ .Values.services.account.port }}
+
+To cut traffic over to the other slot:
+  helm upgrade banking-app ./banking-app -n {{ .Values.namespace }} --reuse-values \
+    --set activeSlot={{ if eq .Values.activeSlot "blue" }}green{{ else }}blue{{ end }}

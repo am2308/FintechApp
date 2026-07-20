@@ -1,0 +1,61 @@
+# Default values for banking-app.
+# Anything here can be overridden with -f a-values-file.yaml or --set key=value.
+
+namespace: banking
+
+image:
+  registry: docker.io/<dockerhub-namespace>   # e.g. docker.io/amit2308
+  pullPolicy: IfNotPresent
+
+# ── Blue-green control ──
+# activeSlot decides which set of pods the STABLE Service (the one Ingress
+# and other services actually talk to) routes traffic to. Flipping this and
+# running `helm upgrade` is the entire cutover step — no pods are touched,
+# only the Service selector changes.
+activeSlot: blue   # blue | green
+
+# Each microservice gets its own independent image tag PER SLOT, so you can
+# run v12 on blue (serving prod traffic) while v13 is deployed to green for
+# testing, entirely independently of which slot is currently active.
+services:
+  account:
+    port: 8081
+    replicas: 2
+    blueTag: "stable"
+    greenTag: "stable"
+    resources:
+      requests: { cpu: 250m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+  auth:
+    port: 8082
+    replicas: 2
+    blueTag: "stable"
+    greenTag: "stable"
+    resources:
+      requests: { cpu: 250m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+  transaction:
+    port: 8083
+    replicas: 2
+    blueTag: "stable"
+    greenTag: "stable"
+    resources:
+      requests: { cpu: 250m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+
+mysql:
+  image: mariadb:10.9
+  rootPasswordSecretName: mysql-secret
+  rootPasswordSecretKey: root-password
+  storage: 5Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  host: banking.example.com
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70

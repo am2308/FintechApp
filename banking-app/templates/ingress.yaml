@@ -1,0 +1,27 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: banking-ingress
+  namespace: {{ .Values.namespace }}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /account
+            pathType: Prefix
+            backend:
+              service: { name: account-service, port: { number: {{ .Values.services.account.port }} } }
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service: { name: auth-service, port: { number: {{ .Values.services.auth.port }} } }
+          - path: /transaction
+            pathType: Prefix
+            backend:
+              service: { name: transaction-service, port: { number: {{ .Values.services.transaction.port }} } }
+{{- end }}
