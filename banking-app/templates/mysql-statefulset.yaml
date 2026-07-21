@@ -43,6 +43,11 @@ spec:
   volumeClaimTemplates:
     - metadata: { name: mysql-data }
       spec:
+        # Explicit, not relying on a cluster default that may not exist —
+        # see templates/storageclass.yaml for why this specific setting
+        # (WaitForFirstConsumer) is what actually fixes the PVC scheduling
+        # error, not just naming a StorageClass.
+        storageClassName: {{ .Values.mysql.storageClassName }}
         accessModes: ["ReadWriteOnce"]
         resources:
           requests: { storage: {{ .Values.mysql.storage }} }

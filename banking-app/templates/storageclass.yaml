@@ -1,0 +1,25 @@
+# A dedicated StorageClass for MySQL's data volume, rather than relying on
+# whatever the cluster's default happens to be (or isn't — this is exactly
+# what caused the "0/3 nodes are available: unbound immediate
+# PersistentVolumeClaims" error: no default StorageClass existed, so the
+# PVC had nothing to bind to).
+#
+# volumeBindingMode: WaitForFirstConsumer (not the StorageClass default of
+# Immediate) is the specific setting that matters here — it delays actually
+# provisioning the EBS volume until a node has already been chosen for the
+# pod, so the volume gets created in the SAME AZ as that node. With
+# Immediate binding, EKS can provision the volume in one AZ before the
+# scheduler picks a node in a different AZ — the exact zone-mismatch
+# variant of the same scheduling error.
+{{- if .Values.mysql.createStorageClass }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Values.mysql.storageClassName }}
+provisioner: ebs.csi.aws.com   # requires the EBS CSI driver addon — see session doc prerequisites
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  encrypted: "true"
+{{- end }}
