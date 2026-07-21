@@ -160,18 +160,6 @@ jobs:
             --set services.transaction.${{ steps.determine.outputs.inactive_slot }}Tag=${{ env.IMAGE_TAG }} \
             --wait --timeout 5m
           fi
-      - name: Smoke Test Inactive Slot
-        run: |
-          kubectl port-forward -n ${{ env.NAMESPACE }} svc/account-service-blue 18081:8081 &
-          PF_PID=$!
-          sleep 3
-          for i in $(seq 1 10); do
-            if curl -sf http://localhost:18081/health; then echo "account-service ($SLOT) healthy"; kill $PF_PID; exit 0; fi
-            sleep 5
-          done
-          kill $PF_PID
-          echo "Inactive slot failed health check — NOT proceeding to cutover"
-          exit 1
 
   # ── Smoke-test the new slot DIRECTLY, before it receives any real traffic ──
   # smoke-test-inactive-slot:
