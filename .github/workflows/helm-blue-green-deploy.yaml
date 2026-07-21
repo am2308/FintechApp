@@ -160,6 +160,18 @@ jobs:
             --set services.transaction.${{ steps.determine.outputs.inactive_slot }}Tag=${{ env.IMAGE_TAG }} \
             --wait --timeout 5m
           fi
+      - name: Smoke Test Inactive Slot
+        run: |
+          kubectl port-forward -n ${{ env.NAMESPACE }} svc/account-service-blue 18081:8081 &
+          PF_PID=$!
+          sleep 3
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:18081/health; then echo "account-service ($SLOT) healthy"; kill $PF_PID; exit 0; fi
+            sleep 5
+          done
+          kill $PF_PID
+          echo "Inactive slot failed health check — NOT proceeding to cutover"
+          exit 1
 
   # ── Smoke-test the new slot DIRECTLY, before it receives any real traffic ──
   # smoke-test-inactive-slot:
@@ -182,21 +194,21 @@ jobs:
   #         exit 1
 
   # ── Cutover — gated behind a required-reviewer GitHub Environment ──
-  cutover:
-    name: Cut Traffic Over to New Slot
-    needs: [deploy-inactive-slot]
-    runs-on: ubuntu-latest
-    environment: production   # attach required reviewers here in repo settings
-    steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
-        with: { version: v3.15.0 }
+  # cutover:
+  #   name: Cut Traffic Over to New Slot
+  #   needs: [deploy-inactive-slot]
+  #   runs-on: ubuntu-latest
+  #   environment: production   # attach required reviewers here in repo settings
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: azure/setup-helm@v4
+  #       with: { version: v3.15.0 }
 
-      - name: Flip the stable Service to the new slot
-        run: |
-          helm upgrade ${{ env.RELEASE_NAME }} ./banking-app \
-            -n ${{ env.NAMESPACE }} --reuse-values \
-            --set activeSlot=${{ needs.deploy-inactive-slot.outputs.inactive_slot }}
+  #     - name: Flip the stable Service to the new slot
+  #       run: |
+  #         helm upgrade ${{ env.RELEASE_NAME }} ./banking-app \
+  #           -n ${{ env.NAMESPACE }} --reuse-values \
+  #           --set activeSlot=${{ needs.deploy-inactive-slot.outputs.inactive_slot }}
 
       # - name: Confirm the stable endpoint is now serving the new version
       #   run: |
