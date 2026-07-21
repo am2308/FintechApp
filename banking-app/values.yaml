@@ -47,7 +47,20 @@ mysql:
   image: mariadb:10.9
   rootPasswordSecretName: mysql-secret
   rootPasswordSecretKey: root-password
+
+  # ── External Secrets Operator config ──
+  # No `rootPassword` field here anymore, deliberately — the password now
+  # lives ONLY in AWS Secrets Manager. See templates/secret-and-serviceaccount.yaml.
+  externalSecret:
+    enabled: true
+    clusterSecretStoreName: aws-secrets-manager
+    secretsManagerKey: banking/mysql/root-password   # the actual secret name in Secrets Manager
+    refreshInterval: 1h
+
+  # ── Storage ──
   storage: 5Gi
+  storageClassName: banking-mysql-gp3
+  createStorageClass: true   # set false if your cluster already has a suitable default StorageClass
 
 ingress:
   enabled: true
