@@ -82,7 +82,7 @@ jobs:
     if: github.event.inputs.rollback_to == ''
     name: Deploy New Version to Inactive Slot
     needs: package-and-push-chart
-    runs-on: ubuntu-latest
+    runs-on: ['self-hosted', 'fintech-app-deploy']
     outputs:
       inactive_slot: ${{ steps.determine.outputs.inactive_slot }}
     steps:
