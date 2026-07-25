@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::637423357784:oidc-provider/oidc.eks.ap-south-1.amazonaws.com/id/2982D9FB4D9FD5E0560275F036DAF08C"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "oidc.eks.ap-south-1.amazonaws.com/id/2982D9FB4D9FD5E0560275F036DAF08C:sub": "system:serviceaccount:monitoring:prometheus-kube-prometheus-prometheus",
+          "oidc.eks.ap-south-1.amazonaws.com/id/2982D9FB4D9FD5E0560275F036DAF08C:aud": "sts.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

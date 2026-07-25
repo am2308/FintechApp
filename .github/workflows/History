@@ -1,0 +1,159 @@
+1016  eksctl create cluster --name=amcdemo \\n                      --region=ap-south-1 \\n                      --zones=ap-south-1a,ap-south-1b \\n                      --without-nodegroup
+ 1017  CLUSTER_NAME=amcdemo
+ 1018  REGION=ap-south-1
+ 1019  ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+ 1020  echo $ACCOUNT_ID
+ 1021  OIDC_URL=$(aws eks describe-cluster --name $CLUSTER_NAME --query cluster.identity.oidc.issuer --output text)
+ 1022  OIDC_HOST=$(echo $OIDC_URL | sed 's|https://||')
+ 1023  echo "Account:   $ACCOUNT_ID"\necho "OIDC URL:  $OIDC_URL"\necho "OIDC Host: $OIDC_HOST"
+ 1024  AMP_WORKSPACE=$(aws amp create-workspace \\n  --alias fintech-metrics-prod \\n  --region $REGION \\n  --query workspaceId \\n  --output text)
+ 1025  echo "AMP Workspace ID: $AMP_WORKSPACE"
+ 1026  aws amp describe-workspace \\n  --workspace-id $AMP_WORKSPACE \\n  --region $REGION \\n  --query workspace.status
+ 1027  AMP_ENDPOINT=$(aws amp describe-workspace \\n  --workspace-id $AMP_WORKSPACE \\n  --region $REGION \\n  --query workspace.prometheusEndpoint \\n  --output text)
+ 1028  REMOTE_WRITE_URL="${AMP_ENDPOINT}api/v1/remote_write"\necho "Remote Write URL: $REMOTE_WRITE_URL"
+ 1029  aws amp tag-resource \\n  --resource-arn "arn:aws:aps:${REGION}:${ACCOUNT_ID}:workspace/${AMP_WORKSPACE}" \\n  --tags Env=production,App=fintech \\n  --region $REGION
+ 1030  aws amp list-workspaces --region $REGION --query 'workspaces[].{ID:workspaceId,Alias:alias,Status:status.statusCode}'
+ 1031  cat > prometheus-trust-policy.json << EOF\n{\n  "Version": "2012-10-17",\n  "Statement": [\n    {\n      "Effect": "Allow",\n      "Principal": {\n        "Federated": "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/${OIDC_HOST}"\n      },\n      "Action": "sts:AssumeRoleWithWebIdentity",\n      "Condition": {\n        "StringEquals": {\n          "${OIDC_HOST}:sub": "system:serviceaccount:monitoring:prometheus-kube-prometheus-prometheus",\n          "${OIDC_HOST}:aud": "sts.amazonaws.com"\n        }\n      }\n    }\n  ]\n}\nEOF
+ 1032  cat prometheus-trust-policy.json
+ 1033  ROLE_ARN=$(aws iam create-role \\n  --role-name fintech-prometheus-amp-write \\n  --assume-role-policy-document file:prometheus-trust-policy.json \\n  --description "IRSA role for Prometheus to write to AMP" \\n  --query Role.Arn \\n  --output text)
+ 1034  ROLE_ARN=$(aws iam create-role \\n  --role-name fintech-prometheus-amp-write \\n  --assume-role-policy-document file://prometheus-trust-policy.json \\n  --description "IRSA role for Prometheus to write to AMP" \\n  --query Role.Arn \\n  --output text)
+ 1035  echo "Role ARN: $ROLE_ARN"
+ 1036  aws iam attach-role-policy \\n  --role-name fintech-prometheus-amp-write \\n  --policy-arn arn:aws:iam::aws:policy/AmazonPrometheusRemoteWriteAccess\n
+ 1037  cat > prometheus-amp-policy.json << EOF\n{\n  "Version": "2012-10-17",\n  "Statement": [\n    {\n      "Effect": "Allow",\n      "Action": [\n        "aps:RemoteWrite",\n        "aps:QueryMetrics",\n        "aps:GetSeries",\n        "aps:GetLabels",\n        "aps:GetMetricMetadata"\n      ],\n      "Resource": "arn:aws:aps:${REGION}:${ACCOUNT_ID}:workspace/${AMP_WORKSPACE}"\n    }\n  ]\n}\nEOF
+ 1038  cat prometheus-amp-policy.json
+ 1039  aws iam put-role-policy \\n  --role-name fintech-prometheus-amp-write \\n  --policy-name amp-scoped-access \\n  --policy-document file://prometheus-amp-policy.json
+ 1040  aws iam get-role --role-name fintech-prometheus-amp-write --query Role.Arn
+ 1041  aws iam list-attached-role-policies --role-name fintech-prometheus-amp-write
+ 1042  vi eks-prod-values.yaml
+ 1043  sed -i '' "s|PASTE_ROLE_ARN_HERE|${ROLE_ARN}|g" eks-prod-values.yaml
+ 1044  sed -i '' "s|PASTE_REMOTE_WRITE_URL_HERE|${REMOTE_WRITE_URL}|g" eks-prod-values.yaml
+ 1045  cat eks-prod-values.yaml
+ 1046  kubectl get pods -n banking
+ 1047  kubectl logs account-service-76895b4cdf-qmzlp -n banking
+ 1048  kubectl get deployment -n banking
+ 1049  kubectl rollout restart deployment/account-service -n banking
+ 1050  kubectl rollout restart deployment/auth-service -n banking
+ 1051  kubectl rollout restart deployment/transaction-service -n banking
+ 1052  kubectl get pods -n banking
+ 1053  kubectl logs account-service-87cd6bc7b-hwft2 -n banking
+ 1054  kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+ 1055  helm upgrade --install prometheus \\n  prometheus-community/kube-prometheus-stack \\n  --namespace monitoring \\n  --values eks-prod-values.yaml \\n  --wait \\n  --timeout 10m
+ 1056  kubectl apply -f service-monitors.yaml
+ 1057  kubectl apply -f recording-rules.yaml
+ 1058  PROM_POD=$(kubectl get pod -n monitoring -l app.kubernetes.io/name=prometheus -o jsonpath='{.items[0].metadata.name}')
+ 1059  kubectl get pod -n monitoring -l app.kubernetes.io/name=prometheus
+ 1060  kubectl get pod -n monitoring
+ 1061  kubectl describe pod prometheus-kube-prometheus-operator-75db66c746-ptkq7 -n monitoring | grep -A2 "AWS_ROLE"
+ 1062  kubectl describe pod prometheus-kube-prometheus-operator-75db66c746-ptkq7 -n monitoring
+ 1063  cat eks-prod-values.yaml
+ 1064  kubectl get sa -n monitoring
+ 1065  vi prometheus-values.yaml
+ 1066  cat eks-prod-values.yaml | grep us-east
+ 1067  cat prometheus-values.yaml | grep us-east
+ 1068  kubectl get sa -n monitoring -o yaml | grep -A3 "annotations"
+ 1069  kubectl get statefulset -n monitoring
+ 1070  kubectl get storageclass
+ 1071  kubectl get sa prometheus-kube-prometheus-prometheus -n monitoring -o yaml | grep -A3 "annotations"
+ 1072  aws eks create-addon --cluster-name amcdemo --addon-name aws-ebs-csi-driver
+ 1073  kubectl get pods -n kube-system | grep ebs-csi
+ 1074  echo $OIDC
+ 1075  echo $OIDC_URL
+ 1076  echo $OIDC_HOST
+ 1077  cat > ebs-csi-trust-policy.json << EOF\n{\n  "Version": "2012-10-17",\n  "Statement": [{\n    "Effect": "Allow",\n    "Principal": {\n      "Federated": "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/${OIDC_HOST}"\n    },\n    "Action": "sts:AssumeRoleWithWebIdentity",\n    "Condition": {\n      "StringEquals": {\n        "oidc.eks.${REGION}.amazonaws.com/id/2982D9FB4D9FD5E0560275F036DAF08C:aud": "sts.amazonaws.com",\n        "oidc.eks.${REGION}.amazonaws.com/id/2982D9FB4D9FD5E0560275F036DAF08C:sub": "system:serviceaccount:kube-system:ebs-csi-controller-sa"\n      }\n    }\n  }]\n}\nEOF
+ 1078  cat ebs-csi-trust-policy.json
+ 1079  aws iam create-role \\n  --role-name AmazonEKS_EBS_CSI_DriverRole \\n  --assume-role-policy-document file://ebs-csi-trust-policy.json \\n  --description "IRSA role for EBS CSI driver on amcdemo cluster"
+ 1080  aws iam create-role \\n  --role-name AmazonEKS_EBS_CSI_DriverRole \\n  --assume-role-policy-document file://ebs-csi-trust-policy.json \\n  --description "IRSA role for EBS CSI driver on amcdemo cluster"
+ 1081  aws iam attach-role-policy \\n  --role-name AmazonEKS_EBS_CSI_DriverRole \\n  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+ 1082  aws iam get-role \\n  --role-name AmazonEKS_EBS_CSI_DriverRole \\n  --query Role.Arn --output text
+ 1083  aws iam list-attached-role-policies \\n  --role-name AmazonEKS_EBS_CSI_DriverRole \\n  --output table
+ 1084  kubectl describe serviceaccount ebs-csi-controller-sa \\n  -n kube-system | grep "role-arn"
+ 1085  kubectl describe serviceaccount ebs-csi-controller-sa \\n  -n kube-system
+ 1086  aws eks update-addon \\n  --cluster-name amcdemo \\n  --addon-name aws-ebs-csi-driver \\n  --service-account-role-arn arn:aws:iam::637423357784:role/AmazonEKS_EBS_CSI_DriverRole \\n  --region ap-south-1
+ 1087  kubectl describe serviceaccount ebs-csi-controller-sa \\n  -n kube-system
+ 1088  vi storage-class.yaml
+ 1089  kubectl apply -f storage-class.yaml
+ 1090  kubectl get storageclass
+ 1091  helm upgrade prometheus \\n  prometheus-community/kube-prometheus-stack \\n  --namespace monitoring \\n  --values prometheus-values.yaml \\n  --wait \\n  --timeout 10m
+ 1092  kubectl describe serviceaccount ebs-csi-controller-sa \\n  -n kube-system
+ 1093  kubectl describe pod \\n  $(kubectl get pod -n kube-system -l app=ebs-csi-controller -o jsonpath='{.items[0].metadata.name}') \\n  -n kube-system | grep -E "AWS_ROLE|AWS_WEB_IDENTITY|Service Account"
+ 1094  aws iam list-open-id-connect-providers --output table
+ 1095  echo $OIDC_URL
+ 1096  aws iam get-role \\n  --role-name AmazonEKS_EBS_CSI_DriverRole \\n  --query Role.AssumeRolePolicyDocument \\n  --output json
+ 1097  kubectl get mutatingwebhookconfiguration | grep -i "pod-identity\|amazon-eks"
+ 1098  kubectl get pods -n kube-system | grep -i "pod-identity\|webhook"
+ 1099  aws eks describe-addon \\n  --cluster-name amcdemo \\n  --addon-name aws-ebs-csi-driver \\n  --region ap-south-1 \\n  --query 'addon.{status:status, serviceAccountRoleArn:serviceAccountRoleArn, addonVersion:addonVersion}' \\n  --output json
+ 1100  kubectl get serviceaccount ebs-csi-controller-sa \\n  -n kube-system -o yaml | grep -A5 "annotations"
+ 1101  aws eks update-addon \\n  --cluster-name amcdemo \\n  --addon-name aws-ebs-csi-driver \\n  --service-account-role-arn arn:aws:iam::637423357784:role/AmazonEKS_EBS_CSI_DriverRole \\n  --resolve-conflicts OVERWRITE \\n  --region ap-south-1
+ 1102  watch
+ 1103  watch -n5 'aws eks describe-addon \\n  --cluster-name amcdemo \\n  --addon-name aws-ebs-csi-driver \\n  --region ap-south-1 \\n  --query addon.status --output text'
+ 1104  kubectl annotate serviceaccount ebs-csi-controller-sa \\n  -n kube-system \\n  eks.amazonaws.com/role-arn=arn:aws:iam::637423357784:role/AmazonEKS_EBS_CSI_DriverRole \\n  --overwrite
+ 1105  kubectl rollout restart deployment ebs-csi-controller -n kube-system
+ 1106  kubectl describe pod \\n  $(kubectl get pod -n kube-system -l app=ebs-csi-controller \\n    -o jsonpath='{.items[0].metadata.name}') \\n  -n kube-system | grep -E "AWS_ROLE_ARN|AWS_WEB_IDENTITY"
+ 1107  kubectl describe pod \\n  $(kubectl get pod -n kube-system -l app=ebs-csi-controller \\n    -o jsonpath='{.items[0].metadata.name}') \\n  -n kube-system | grep -E "AWS_ROLE_ARN|AWS_WEB_IDENTITY"
+ 1108  kubectl get storagecalss -A
+ 1109  kubectl get storageclass -A
+ 1110  kubectl delete pvc -n monitoring --all
+ 1111  kubectl delete pod -n monitoring \\n  prometheus-prometheus-kube-prometheus-prometheus-0 \\n  alertmanager-prometheus-kube-prometheus-alertmanager-0 \\n  2>/dev/null; true
+ 1112  kubectl get pvc -n monitoring -w
+ 1113  kubectl get pods -n monitoring
+ 1114  PROM_POD=$(kubectl get pod -n monitoring \\n  -l app.kubernetes.io/name=prometheus \\n  -o jsonpath='{.items[0].metadata.name}')
+ 1115  kubectl describe pod $PROM_POD -n monitoring | grep "AWS_ROLE_ARN"
+ 1116  kubectl logs $PROM_POD -n monitoring -c prometheus --tail=30 \\n  | grep -i "remote\|error\|warn\|amp"
+ 1117  kubectl port-forward -n monitoring $PROM_POD 9090:9090 &
+ 1118  aws amp query-metrics \\n  --workspace-id $AMP_WORKSPACE \\n  --region $REGION \\n  --query 'count(up{namespace="banking"})' 2>/dev/null || echo "Use awscurl for AMP queries"
+ 1119  awscurl
+ 1120  pip install awscurl
+ 1121  brew install awscurl
+ 1122  awscurl --service aps \\n  "${AMP_ENDPOINT}api/v1/query?query=up" \\n  --region $REGION | jq '.data.result[] | {job:.metric.job, up:.value[1]}'
+ 1123  kubectl exec -n monitoring $PROM_POD -- \\n  curl -s http://localhost:9090/api/v1/targets | \\n  jq '.data.activeTargets[] | select(.labels.namespace=="banking") | {job:.labels.job, health:.health}'
+ 1124  AMG_ID=$(aws grafana create-workspace \\n  --account-access-type CURRENT_ACCOUNT \\n  --authentication-providers AWS_SSO \\n  --permission-type SERVICE_MANAGED \\n  --workspace-name fintech-prod \\n  --workspace-description "FintechApp production observability" \\n  --workspace-data-sources PROMETHEUS CLOUDWATCH \\n  --region $REGION \\n  --query workspace.id \\n  --output text)
+ 1125  echo $REGION
+ 1126  AMG_REGION="us-east-1"
+ 1127  AMG_ID=$(aws grafana create-workspace \\n  --account-access-type CURRENT_ACCOUNT \\n  --authentication-providers AWS_SSO \\n  --permission-type SERVICE_MANAGED \\n  --workspace-name fintech-prod \\n  --workspace-description "FintechApp production observability" \\n  --workspace-data-sources PROMETHEUS CLOUDWATCH \\n  --region $AMG_REGION \\n  --query workspace.id \\n  --output text)
+ 1128  cat > amg-trust-policy.json << EOF\n{\n  "Version": "2012-10-17",\n  "Statement": [{\n    "Effect": "Allow",\n    "Principal": {\n      "Service": "grafana.amazonaws.com"\n    },\n    "Action": "sts:AssumeRole",\n    "Condition": {\n      "StringEquals": {\n        "aws:SourceAccount": "${ACCOUNT_ID}"\n      }\n    }\n  }]\n}\nEOF
+ 1129  cat amg-trust-policy.json
+ 1130  aws iam create-role \\n  --role-name AmazonGrafanaServiceRole \\n  --assume-role-policy-document file://amg-trust-policy.json \\n  --description "Service role for Amazon Managed Grafana"
+ 1131  aws iam attach-role-policy \\n  --role-name AmazonGrafanaServiceRole \\n  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonGrafanaAthenaAccess 2>/dev/null; true
+ 1132  aws iam attach-role-policy \\n  --role-name AmazonGrafanaServiceRole \\n  --policy-arn arn:aws:iam::aws:policy/AmazonPrometheusQueryAccess
+ 1133  aws iam attach-role-policy \\n  --role-name AmazonGrafanaServiceRole \\n  --policy-arn arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess
+ 1134  AMG_ROLE_ARN=$(aws iam get-role \\n  --role-name AmazonGrafanaServiceRole \\n  --query Role.Arn \\n  --output text)
+ 1135  AMG_ID=$(aws grafana create-workspace \\n  --account-access-type CURRENT_ACCOUNT \\n  --authentication-providers AWS_SSO \\n  --permission-type CUSTOMER_MANAGED \\n  --workspace-role-arn "$AMG_ROLE_ARN" \\n  --workspace-name fintech-prod \\n  --workspace-description "FintechApp production observability" \\n  --workspace-data-sources PROMETHEUS CLOUDWATCH \\n  --region $AMG_REGION \\n  --query workspace.id \\n  --output text)
+ 1136  aws grafana describe-workspace --workspace-id $AMG_ID --region $REGION \\n  --query workspace.status
+ 1137  aws grafana describe-workspace --workspace-id $AMG_ID --region $AMG_REGION \\n  --query workspace.status
+ 1138  history
+ 1139  history 1
+ 1140  aws grafana describe-workspace --workspace-id $AMG_ID --region $AMG_REGION \\n  --query workspace.status
+ 1141  YOUR_USER_ID=$(aws identitystore list-users \\n  --identity-store-id $(aws sso-admin list-instances --query 'Instances[0].IdentityStoreId' --output text) \\n  --filter AttributePath=UserName,AttributeValue=kanikaagarwal0821@gmail.com \\n  --query 'Users[0].UserId' --output text)
+ 1142  echo $YOUR_USER_ID
+ 1143  aws grafana update-permissions \\n  --workspace-id $AMG_ID \\n  --update-instruction-batch \\n    "action=ADD,role=ADMIN,users=[{id=${YOUR_USER_ID},type=SSO_USER}]" \\n  --region $AMG_REGION
+ 1144  GRAFANA_URL=$(aws grafana describe-workspace \\n  --workspace-id $AMG_ID \\n  --region $AMG_REGION \\n  --query workspace.endpoint \\n  --output text)\necho "Grafana URL: https://${GRAFANA_URL}"\nopen "https://${GRAFANA_URL}"
+ 1145  GRAFANA_API_KEY=$(aws grafana create-workspace-api-key \\n  --key-name automation \\n  --key-role ADMIN \\n  --seconds-to-live 86400 \\n  --workspace-id $AMG_ID \\n  --region $AMG_REGION \\n  --query key \\n  --output text)
+ 1146  echo ${AMP_ENDPOINT}
+ 1147  curl -X POST "https://${GRAFANA_URL}/api/datasources" \\n  -H "Authorization: Bearer ${GRAFANA_API_KEY}" \\n  -H "Content-Type: application/json" \\n  -d '{\n    "name": "AMP-Fintech",\n    "type": "prometheus",\n    "access": "proxy",\n    "url": "'"${AMP_ENDPOINT}api/v1/"'",\n    "isDefault": true,\n    "jsonData": {\n      "sigV4Auth": true,\n      "sigV4Region": "'"${REGION}"'",\n      "sigV4AuthType": "workspace-iam-role",\n      "httpMethod": "POST",\n      "timeInterval": "15s"\n    }\n  }' | jq
+ 1148  curl -s "https://${GRAFANA_URL}/api/datasources" \\n  -H "Authorization: Bearer ${GRAFANA_API_KEY}" | jq '.[].name'
+ 1149  echo ${GRAFANA_URL}
+ 1150  echo $${GRAFANA_API_KEY}
+ 1151  echo ${GRAFANA_API_KEY}
+ 1152  GRAFANA_DASHBORD_URL=https://${GRAFANA_URL}
+ 1153  echo GRAFANA_DASHBORD_URL
+ 1154  echo $GRAFANA_DASHBORD_URL
+ 1155  GRAFANA_AUTH="Bearer $GRAFANA_API_KEY"
+ 1156  echo $GRAFANA_AUTH
+ 1157  import_dashboard() {\n  local DASH_ID=$1\n  local DS_NAME=${2:-"Prometheus"}\n  echo "Importing dashboard ID: $DASH_ID"\n  curl -s "https://grafana.com/api/dashboards/${DASH_ID}/revisions/latest/download" | \\n    jq --arg ds "$DS_NAME" '\n      .panels |= map(if .datasource then .datasource.name = $ds else . end) |\n      {dashboard: ., overwrite: true, folderId: 0}\n    ' | \\n    curl -s -X POST "${GRAFANA_DASHBOARD_URL}/api/dashboards/import" \\n      -H "Content-Type: application/json" \\n      -u "${GRAFANA_AUTH}" \\n      -d @- | jq '.status, .slug'\n}
+ 1158  import_dashboard 15760
+ 1159  import_dashboard 15760
+ 1160  import_dashboard() {\n  local DASH_ID=$1\n  local DS_NAME=${2:-"Prometheus"}\n  echo "Importing dashboard ID: $DASH_ID"\n  curl -s "https://grafana.com/api/dashboards/${DASH_ID}/revisions/latest/download" | \\n    jq --arg ds "$DS_NAME" '\n      .panels |= map(if .datasource then .datasource.name = $ds else . end) |\n      {dashboard: ., overwrite: true, folderId: 0}\n    ' | \\n    curl -s -X POST "${GRAFANA_DASHBOARD_URL}/api/dashboards/import" \\n      -H "Content-Type: application/json" \\n      -H "Authorization: Bearer ${GRAFANA_API_KEY}" \\n      -d @- | jq '.status, .slug'\n}
+ 1161  import_dashboard 15760
+ 1162  import_dashboard 1860
+ 1163  import_dashboard 6417
+ 1164  import_dashboard 16110
+ 1165  import_dashboard 9578
+ 1166  awscurl --service aps \\n  "${AMP_ENDPOINT}api/v1/query?query=up" \\n  --region $REGION | jq '.data.result[] | {job:.metric.job, up:.value[1]}'
+ 1167  kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 -n monitoring
+ 1168  kubectl get svc -n monitoring
+ 1169  kubectl port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090 -n monitoring
+ 1170  kubectl get servicemonitor -A
+ 1171  kubectl get svc -A | grep prometheus
+ 1172  kubectl get svc account-service \\n  -n monitoring \\n  --show-labels
+ 1173  kubectl get svc account-service \\n  -n banking \\n  --show-labels
+ 1174  kubectl get servicemonitor account-service \\n  -n monitoring -o yaml

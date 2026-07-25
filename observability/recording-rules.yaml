@@ -1,0 +1,67 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: fintech-recording-rules
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  groups:
+  - name: fintech.http.rates
+    interval: 15s
+    rules:
+    # Pre-compute request rate — dashboards use this for performance
+    - record: job:http_requests:rate5m
+      expr: |
+        sum by (service, slot) (rate(http_requests_total[5m]))
+
+    - record: job:http_5xx_errors:rate5m
+      expr: |
+        sum by (service, slot) (
+          rate(http_errors_total{error_class="server_error"}[5m])
+        )
+
+    - record: job:http_4xx_errors:rate5m
+      expr: |
+        sum by (service, slot) (
+          rate(http_errors_total{error_class="client_error"}[5m])
+        )
+
+    - record: job:http_error_ratio:rate5m
+      expr: |
+        job:http_5xx_errors:rate5m / (job:http_requests:rate5m > 0)
+
+  - name: fintech.latency
+    interval: 15s
+    rules:
+    - record: job:http_request_duration_p50:5m
+      expr: |
+        histogram_quantile(0.50,
+          sum by (service, slot, le) (rate(http_request_duration_seconds_bucket[5m]))
+        )
+
+    - record: job:http_request_duration_p95:5m
+      expr: |
+        histogram_quantile(0.95,
+          sum by (service, slot, le) (rate(http_request_duration_seconds_bucket[5m]))
+        )
+
+    - record: job:http_request_duration_p99:5m
+      expr: |
+        histogram_quantile(0.99,
+          sum by (service, slot, le) (rate(http_request_duration_seconds_bucket[5m]))
+        )
+
+  - name: fintech.business
+    interval: 15s
+    rules:
+    - record: job:transaction_success_rate:5m
+      expr: |
+        rate(business_operations_total{operation="transaction",status="success"}[5m])
+        / rate(business_operations_total{operation="transaction"}[5m])
+
+    - record: job:auth_success_rate:5m
+      expr: |
+        rate(business_operations_total{operation="authentication",status="success"}[5m])
+        / rate(business_operations_total{operation="authentication"}[5m])
+

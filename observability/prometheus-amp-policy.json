@@ -1,0 +1,16 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "aps:RemoteWrite",
+        "aps:QueryMetrics",
+        "aps:GetSeries",
+        "aps:GetLabels",
+        "aps:GetMetricMetadata"
+      ],
+      "Resource": "arn:aws:aps:ap-south-1:637423357784:workspace/ws-056c9d30-c4cc-41de-ab25-178f919eec30"
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+# ============================================================
+# kube-prometheus-stack — FIXED production values for EKS
+# Region: ap-south-1  |  Cluster: fintech-prod
+#
+# BUGS FIXED vs original:
+#  1. prometheus.serviceAccount → moved to prometheus.serviceAccount
+#     BUT the SA that needs IRSA is the one the Prometheus StatefulSet
+#     uses, which is created under prometheusSpec.serviceAccountName.
+#     In kube-prometheus-stack the correct key is:
+#       prometheus.serviceAccount.annotations   ← for the Prometheus SA
+#     The operator SA is separate (kube-prometheus-stack.prometheusOperator.serviceAccount)
+#     Your original had the annotation on the OPERATOR SA, not the Prometheus SA.
+#
+#  2. sigv4.region was "us-east-1" but your AMP workspace is ap-south-1
+#     (the URL says ap-south-1) — SigV4 region MUST match the endpoint region.
+#
+#  3. gp3 StorageClass may not exist on EKS by default — added fallback note.
+#
+#  4. alertmanager replicas:2 requires a PDB-compatible setup — kept at 1
+#     for initial bring-up, easy to change back.
+# ============================================================
+
+# ── Prometheus Operator (the controller) ─────────────────────────────────────
+# This is a SEPARATE service account from the Prometheus server itself.
+# The operator does NOT need AMP access — only the Prometheus StatefulSet does.
+prometheusOperator:
+  serviceAccount:
+    create: true
+    name: "prometheus-kube-prometheus-operator"
+    # NO IRSA annotation here — operator doesn't write to AMP
+
+# ── Prometheus Server (the one that scrapes and remote_writes) ────────────────
+# THIS is the SA that needs the IRSA annotation.
+# The kube-prometheus-stack chart creates this SA separately from the operator SA.
+prometheus:
+  serviceAccount:
+    create: true
+    name: "prometheus-kube-prometheus-prometheus"   # explicit name
+    annotations:
+      # IRSA — this annotation tells EKS to inject AWS credentials
+      # into the Prometheus pod via the token projection mechanism
+      eks.amazonaws.com/role-arn: "arn:aws:iam::637423357784:role/fintech-prometheus-amp-write"
+
+  prometheusSpec:
+    # ── Retention (local ring buffer — AMP keeps the long-term copy) ─────────
+    retention: 24h
+    retentionSize: 10GB
+
+    # ── Storage (PVC for local buffer) ───────────────────────────────────────
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          # gp3 must exist — verify with: kubectl get sc
+          # If it doesn't exist: kubectl apply -f gp3-storageclass.yaml (see below)
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+
+    # ── Scrape config ────────────────────────────────────────────────────────
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    scrapeTimeout: 10s
+
+    # ── ServiceMonitor discovery — find SMs in ALL namespaces ────────────────
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorNamespaceSelector: {}
+    serviceMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+    podMonitorSelector: {}
+    ruleNamespaceSelector: {}
+    ruleSelector: {}
+
+    # ── AMP remote_write ─────────────────────────────────────────────────────
+    # BUG FIX: region was "us-east-1" — AMP URL is ap-south-1 so region must match
+    remoteWrite:
+    - url: "https://aps-workspaces.ap-south-1.amazonaws.com/workspaces/ws-056c9d30-c4cc-41de-ab25-178f919eec30/api/v1/remote_write"
+      sigv4:
+        region: ap-south-1    # ← FIXED: was "us-east-1", must match AMP endpoint region
+      queueConfig:
+        capacity: 10000
+        maxSamplesPerSend: 1000
+        maxShards: 10
+        batchSendDeadline: 5s
+        minBackoff: 30ms
+        maxBackoff: 5s
+      writeRelabelConfigs:
+      - action: labeldrop
+        regex: '(pod_template_hash|controller_revision_hash)'
+      # Optional: only ship metrics you care about to reduce AMP cost
+      # - sourceLabels: [__name__]
+      #   regex: 'up|http_requests_total|http_request_duration.*|business_operations.*|kube_pod.*|node_cpu.*|node_memory.*'
+      #   action: keep
+
+    # ── Resource limits ──────────────────────────────────────────────────────
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+
+    # ── Additional scrape configs (optional, for non-ServiceMonitor targets) ─
+    # additionalScrapeConfigs: []
+
+# ── Grafana — disabled (using AWS Managed Grafana) ───────────────────────────
+grafana:
+  enabled: false
+
+# ── Alertmanager ─────────────────────────────────────────────────────────────
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    replicas: 1      # start with 1; scale to 2 after verifying storage works
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+# ── Node Exporter (infra metrics) ────────────────────────────────────────────
+prometheus-node-exporter:
+  enabled: true
+
+# ── kube-state-metrics (Deployment/Pod/HPA state) ────────────────────────────
+kube-state-metrics:
+  enabled: true

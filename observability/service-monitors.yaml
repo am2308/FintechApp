@@ -1,0 +1,71 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: account-service
+  namespace: monitoring
+  labels:
+    release: prometheus    # MUST match the Helm release name
+spec:
+  namespaceSelector:
+    matchNames: [banking]
+  selector:
+    matchLabels:
+      app: account-service
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    relabelings:
+    # Carry the pod's slot label into every metric
+    - sourceLabels: [__meta_kubernetes_pod_label_slot]
+      targetLabel: slot
+    - targetLabel: service
+      replacement: account-service
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: auth-service
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames: [banking]
+  selector:
+    matchLabels:
+      app: auth-service
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_label_slot]
+      targetLabel: slot
+    - targetLabel: service
+      replacement: auth-service
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: transaction-service
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames: [banking]
+  selector:
+    matchLabels:
+      app: transaction-service
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_label_slot]
+      targetLabel: slot
+    - targetLabel: service
+      replacement: transaction-service
+
